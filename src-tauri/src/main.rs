@@ -766,6 +766,8 @@ async fn status(
         }
     };
 
+    let check = gpu_miner.verify().await;
+    info!(target: LOG_TARGET, "check gpu miner result: {:?}", check);
     let gpu_status = match gpu_miner.status(sha_hash_rate, block_reward).await {
         Ok(gpu) => gpu,
         Err(e) => {

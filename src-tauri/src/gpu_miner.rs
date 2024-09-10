@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
-use log::info;
+use log::{info, warn};
 use tari_common_types::tari_address::TariAddress;
 use tari_core::transactions::tari_amount::MicroMinotari;
 use tari_shutdown::ShutdownSignal;
@@ -13,6 +13,7 @@ use crate::{
     process_adapter::StatusMonitor,
     process_watcher::ProcessWatcher,
 };
+use std::process::Command;
 
 const SHA_BLOCKS_PER_DAY: u64 = 360;
 const LOG_TARGET: &str = "tari::universe::gpu_miner";
@@ -96,6 +97,35 @@ impl GpuMiner {
                 estimated_earnings: 0,
                 is_mining: false,
             }),
+        }
+    }
+
+    pub async fn verify(&self) -> Result<(), anyhow::Error> {
+        info!(target: LOG_TARGET, "Verify if gpu miner can work on the system");
+
+        let output = if cfg!(target_os = "windows") {
+            Command::new("cmd")
+                .args(["/C", "xtrgpuminer --detect"])
+                .output()
+                .expect("failed to execute process")
+        } else {
+            Command::new("sh")
+                .arg("-c")
+                .arg("xtrgpuminer --detect")
+                .output()
+                .expect("failed to execute process")
+        };
+
+        match output.status.code() {
+            Some(0) => {
+                info!(target: LOG_TARGET, "Output status code {:?}", output.status.code());
+                Ok(())
+            }
+            Some(_) => Err(anyhow::Error::msg("Non-zero exit code")),
+            None => {
+                warn!(target: LOG_TARGET, "No output status code");
+                Err(anyhow::Error::msg("No output status code"))
+            }
         }
     }
 }
