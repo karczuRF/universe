@@ -91,6 +91,8 @@ impl ProcessAdapter for GpuMinerAdapter {
             http_api_port.to_string(),
             "--gpu-percentage".to_string(),
             self.gpu_percentage.to_string(),
+            "--log-dir".to_string(),
+            _log_dir.to_str().unwrap().to_string(),
         ];
 
         if matches!(
