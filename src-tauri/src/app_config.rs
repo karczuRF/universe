@@ -69,9 +69,9 @@ impl AppConfig {
             version: 1,
             config_file: None,
             mode: MiningMode::Eco,
-            auto_mining: false,
+            auto_mining: true,
             p2pool_enabled: false,
-            last_binaries_update_timestamp: SystemTime::now(),
+            last_binaries_update_timestamp: SystemTime::UNIX_EPOCH,
             allow_telemetry: true,
             anon_id: generate_password(20),
             monero_address: DEFAULT_MONERO_ADDRESS.to_string(),
@@ -96,6 +96,7 @@ impl AppConfig {
                     self.allow_telemetry = config.allow_telemetry;
                     self.anon_id = config.anon_id;
                     self.version = config.version;
+                    self.monero_address = config.monero_address;
                     if self.version == 0 {
                         // migrate
                         self.version = 1;
@@ -119,9 +120,15 @@ impl AppConfig {
                         self.p2pool_enabled = true;
                     }
                     if self.version == 4 {
-                        self.version = 4;
+                        self.version = 5;
                         // temporarily disable p2pool by default
                         self.p2pool_enabled = false;
+                    }
+                    if self.version == 5 {
+                        self.version = 6;
+
+                        // start mining as soon as setup is complete
+                        self.auto_mining = true;
                     }
                 }
                 Err(e) => {

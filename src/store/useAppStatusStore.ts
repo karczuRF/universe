@@ -1,7 +1,6 @@
 import { create } from './create';
 import { ApplicationsVersions, AppStatus } from '../types/app-status.ts';
 import { modeType } from './types.ts';
-import { persist } from 'zustand/middleware';
 
 type State = Partial<AppStatus>;
 
@@ -11,6 +10,7 @@ interface Actions {
     setMode: (mode: modeType) => void;
     setP2poolEnabled: (p2poolEnabled: boolean) => void;
     setTelemetryMode: (telemetryMode: boolean) => void;
+    setMoneroAddress: (moneroAddress: string) => void;
 }
 
 type AppStatusStoreState = State & Actions;
@@ -25,29 +25,17 @@ const initialState: State = {
     mode: 'Eco',
     applications_versions: undefined,
     monero_address: undefined,
+    tari_address_base58: undefined,
+    tari_address_emoji: undefined,
     cpu_mining_enabled: false,
     gpu_mining_enabled: false,
 };
-export const useAppStatusStore = create<AppStatusStoreState>()(
-    persist(
-        (set) => ({
-            ...initialState,
-            setTelemetryMode: (telemetry_mode) => set({ telemetry_mode }),
-            setAppStatus: (appStatus) => set({ ...appStatus }),
-            setApplicationsVersions: (applications_versions) => set({ applications_versions }),
-            setMode: (mode) => set({ mode }),
-            setP2poolEnabled: (p2pool_enabled) => set({ p2pool_enabled }),
-        }),
-        {
-            name: 'statusStore',
-            version: 0.1,
-            partialize: (s) => ({
-                mode: s.mode,
-                cpu_mining_enabled: s.cpu_mining_enabled,
-                gpu_mining_enabled: s.gpu_mining_enabled,
-                p2pool_enabled: s.p2pool_enabled,
-                monero_address: s.monero_address,
-            }),
-        }
-    )
-);
+export const useAppStatusStore = create<AppStatusStoreState>()((set) => ({
+    ...initialState,
+    setTelemetryMode: (telemetry_mode) => set({ telemetry_mode }),
+    setAppStatus: (appStatus) => set({ ...appStatus }),
+    setApplicationsVersions: (applications_versions) => set({ applications_versions }),
+    setMoneroAddress: (monero_address) => set({ monero_address }),
+    setMode: (mode) => set({ mode }),
+    setP2poolEnabled: (p2pool_enabled) => set({ p2pool_enabled }),
+}));
