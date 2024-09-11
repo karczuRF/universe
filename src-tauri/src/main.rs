@@ -292,6 +292,19 @@ async fn setup_inner(
             .ensure_latest(Binaries::GpuMiner, progress.clone())
             .await?;
 
+        let gpu_miner = state.gpu_miner.write().await;
+        match gpu_miner.verify().await {
+            Ok(_) => {
+                info!(target: LOG_TARGET, "Gpu miner available")
+            }
+            Err(e) => {
+                if let Err(e) = set_gpu_mining_enabled(false, state.clone()).await {
+                    error!(target: LOG_TARGET, "Set gpu disabled error {:?}",e)
+                }
+                warn!(target: LOG_TARGET, "Gpu miner unavailable {:?}",e)
+            }
+        }
+
         progress.set_max(30).await;
         progress
             .update("checking-latest-version-xmrig".to_string(), None, 0)
@@ -777,8 +790,6 @@ async fn status(
         }
     };
 
-    let check = gpu_miner.verify().await;
-    info!(target: LOG_TARGET, "check gpu miner result: {:?}", check);
     let gpu = match gpu_miner.status(sha_hash_rate, block_reward).await {
         Ok(gpu) => gpu,
         Err(e) => {
