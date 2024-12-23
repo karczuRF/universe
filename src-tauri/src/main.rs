@@ -6,6 +6,7 @@ use consts::{DB_FILE_NAME, TAPPLETS_ASSETS_DIR};
 use hardware::hardware_status_monitor::HardwareStatusMonitor;
 use log::trace;
 use log::{debug, error, info, warn};
+use ootle::swarm_daemon::start_swarm_daemon;
 use ootle::tapplet_server::start;
 use ootle::{
     setup_tari_universe, setup_tokens, AssetServer, DatabaseConnection, ShutdownTokens, Tokens,
@@ -434,6 +435,12 @@ async fn setup_inner(
         .await;
 
     // TODO RUN TARI UNI
+
+    // TODO run swarm
+    // if let Err(e) = start_swarm_daemon().await {
+    //     error!(target: LOG_TARGET, "Could not start Ootle swarm daemon: {:?}", e);
+    // }
+
     let app_handle_clone_tokens = app.clone();
     let app_handle_clone: tauri::AppHandle = app.clone();
     let data_dir_clone = data_dir.clone();
@@ -484,14 +491,12 @@ async fn setup_inner(
         .await
         .inspect_err(|e| error!(target: LOG_TARGET, "❌ Error launching The Tari Ootle: {:?}", e))
         .map_err(|e| e.to_string());
-    // match tauri::async_runtime::block_on(thread_ootle).expect("Could not set tokens") {
-    //     Ok(_) => {
-    //         info!(target: LOG_TARGET, "🚀 Tari Universe setup completed successfully");
-    //     }
-    //     Err(e) => {
-    //         error!(target: LOG_TARGET, "Error setting up internal wallet: {:?}", e)
-    //     }
-    // };
+
+    // // TODO run swarm
+    // if let Err(e) = start_swarm_daemon().await {
+    //     error!(target: LOG_TARGET, "Could not start wallet daemon: {:?}", e);
+    // }
+
     let tapp_assets_path = app_data_dir.join(TAPPLETS_ASSETS_DIR);
     let (addr, cancel_token) = start(tapp_assets_path).await.unwrap(); //TODO unwrap
     app.manage(AssetServer { addr, cancel_token });
