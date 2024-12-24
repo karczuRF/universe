@@ -1,0 +1,12 @@
+# Swarm Daemon CONFIG "/home/oski/.config/com.tari.universe.alpha/swarm_daemon.config.toml"
+base_dir=""
+start_port= 18000
+network=''
+webserver={}
+processes={}
+skip_registration= false
+auto_register_previous_templates=true
+webui_listen_address ="127.0.0.1:18000"
+no_compile= false
+binaries_root= ""
+disable_template_auto_register= false

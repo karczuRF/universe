@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use auto_launcher::AutoLauncher;
-use consts::{DB_FILE_NAME, TAPPLETS_ASSETS_DIR};
+use consts::{DB_FILE_NAME, SWARM_DAEMON_CONFIG_FILE, TAPPLETS_ASSETS_DIR};
 use hardware::hardware_status_monitor::HardwareStatusMonitor;
 use log::trace;
 use log::{debug, error, info, warn};
@@ -436,11 +436,6 @@ async fn setup_inner(
 
     // TODO RUN TARI UNI
 
-    // TODO run swarm
-    // if let Err(e) = start_swarm_daemon().await {
-    //     error!(target: LOG_TARGET, "Could not start Ootle swarm daemon: {:?}", e);
-    // }
-
     let app_handle_clone_tokens = app.clone();
     let app_handle_clone: tauri::AppHandle = app.clone();
     let data_dir_clone = data_dir.clone();
@@ -452,6 +447,29 @@ async fn setup_inner(
         database::establish_connection(db_path.to_str().unwrap()),
     ))));
     info!(target: LOG_TARGET, "🚀 DB connection established successfully");
+
+    // TODO run swarm
+    let data_dir_swarm = data_dir.clone();
+    let swarm_daemon_config_file = config_dir.join(SWARM_DAEMON_CONFIG_FILE);
+    info!(target: LOG_TARGET, "🚀 Swarm Daemon CONFIG {:?}", swarm_daemon_config_file.clone());
+
+    let thread_swarm_daemon = tauri::async_runtime::spawn(async move {
+        start_swarm_daemon(data_dir_swarm, swarm_daemon_config_file)
+            .await
+            .inspect_err(|e| error!(target: LOG_TARGET, "Could not start Swarm Daemon: {:?}", e))
+            .map_err(|e| e.to_string())
+    });
+    let _ = thread_swarm_daemon
+        .await
+        .inspect_err(|e| error!(target: LOG_TARGET, "❌ Error launching Swarm Daemon {:?}", e))
+        .map_err(|e| e.to_string());
+
+    info!(target: LOG_TARGET, "🚀 Swarm Daemon initialized successfully");
+
+    progress.set_max(95).await;
+    progress
+        .update("starting-Tari-Ootle".to_string(), None, 0)
+        .await;
 
     app.manage(Tokens {
         auth: std::sync::Mutex::new("".to_string()),
@@ -468,14 +486,7 @@ async fn setup_inner(
         .await
         .inspect_err(|e| error!(target: LOG_TARGET, "❌ Error getting tokens: {:?}", e))
         .map_err(|e| e.to_string());
-    // match tauri::async_runtime::block_on(thread_tokens).expect("Could not set tokens") {
-    //     Ok(_) => {
-    //         info!(target: LOG_TARGET, "🚀 Tokens initialized successfully");
-    //     }
-    //     Err(e) => {
-    //         error!(target: LOG_TARGET, "Error setting up internal wallet: {:?}", e)
-    //     }
-    // };
+
     let thread_ootle = tauri::async_runtime::spawn(async move {
         setup_tari_universe(
             app_handle_clone,
@@ -491,11 +502,6 @@ async fn setup_inner(
         .await
         .inspect_err(|e| error!(target: LOG_TARGET, "❌ Error launching The Tari Ootle: {:?}", e))
         .map_err(|e| e.to_string());
-
-    // // TODO run swarm
-    // if let Err(e) = start_swarm_daemon().await {
-    //     error!(target: LOG_TARGET, "Could not start wallet daemon: {:?}", e);
-    // }
 
     let tapp_assets_path = app_data_dir.join(TAPPLETS_ASSETS_DIR);
     let (addr, cancel_token) = start(tapp_assets_path).await.unwrap(); //TODO unwrap
@@ -924,7 +930,8 @@ fn main() {
             commands::read_dev_tapplets,
             commands::delete_dev_tapplet,
             commands::call_wallet,
-            commands::update_installed_tapplet
+            commands::update_installed_tapplet,
+            commands::run_swarm_daemon
         ])
         .build(tauri::generate_context!())
         .inspect_err(

@@ -11,11 +11,14 @@ import { Typography } from '@app/components/elements/Typography';
 import { ToggleSwitch } from '@app/components/elements/ToggleSwitch';
 import { useTranslation } from 'react-i18next';
 import { TappletsOverview } from './TappletsOverview';
+import { useTariOotleStore } from '@app/store/useTariOotleStore';
 
 export const OotleSettings = () => {
     const { t } = useTranslation(['settings', 'ootle']);
     const ootleMode = useAppConfigStore((s) => s.ootle_enabled);
     const localIndexer = useAppConfigStore((s) => s.local_tari_indexer);
+    const runSwarm = useTariOotleStore((s) => s.startSwarmDaemmon);
+    const swarmDaemonInitiated = useTariOotleStore((s) => s.swarmDaemonInitiated);
 
     const setOotleMode = useAppConfigStore((s) => s.setOotleMode);
     const setLocalTariIndexer = useAppConfigStore((s) => s.setLocalTariIndexer);
@@ -27,6 +30,10 @@ export const OotleSettings = () => {
     const handleIndexerSwitch = useCallback(() => {
         setLocalTariIndexer(!localIndexer);
     }, [setLocalTariIndexer, localIndexer]);
+
+    const handleRunSwarmDaemonSwitch = useCallback(() => {
+        runSwarm();
+    }, [runSwarm]);
 
     return (
         <>
@@ -55,6 +62,17 @@ export const OotleSettings = () => {
                             </SettingsGroupContent>
                             <SettingsGroupAction style={{ alignItems: 'center' }}>
                                 <ToggleSwitch checked={localIndexer} onChange={handleIndexerSwitch} />
+                            </SettingsGroupAction>
+                        </SettingsGroup>
+                        <SettingsGroup>
+                            <SettingsGroupContent>
+                                <SettingsGroupTitle>
+                                    <Typography variant="h6">{t('Tari Swarm Daemon', { ns: 'ootle' })}</Typography>
+                                </SettingsGroupTitle>
+                                <Typography>{t('Run Swarm Daemon')}</Typography>
+                            </SettingsGroupContent>
+                            <SettingsGroupAction style={{ alignItems: 'center' }}>
+                                <ToggleSwitch checked={swarmDaemonInitiated} onChange={handleRunSwarmDaemonSwitch} />
                             </SettingsGroupAction>
                         </SettingsGroup>
                         <TappletsOverview />

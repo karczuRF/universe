@@ -21,6 +21,7 @@ use crate::interface::{
 use crate::internal_wallet::{InternalWallet, PaperWalletConfig};
 use crate::node_manager::NodeManagerError;
 
+use crate::ootle::swarm_daemon::start_swarm_daemon;
 use crate::ootle::{
     error,
     error::{
@@ -2046,14 +2047,20 @@ pub async fn call_wallet(
             });
         }
     }
-    // match state.wallet_manager.get_balance().await {
-    //     Ok(w) => {
-    //         info!(target: LOG_TARGET,"🚨 balance {:?}", w.available_balance.to_json());
-    //         Ok(w)
-    //     }
+}
+
+// TODO run or stop swarm daemon if needed (only if Tari Ootle enable)
+#[tauri::command]
+pub async fn run_swarm_daemon() -> Result<(), Error> {
+    info!(target: LOG_TARGET,"🚨🚨🚨 RUN SWARM DAEMON");
+    // match start_swarm_daemon().await {
+    //     Ok(_) => Ok(()),
     //     Err(e) => {
-    //         warn!(target: LOG_TARGET, "Error getting wallet balance: {}", e);
-    //         return Err(e.to_string());
+    //         error!(target: LOG_TARGET,"❌ Error at run_swarm_daemon: {:?}", e);
+    //         return Err(Error::RequestFailed {
+    //             message: e.to_string(),
+    //         });
     //     }
     // }
+    Ok(())
 }
