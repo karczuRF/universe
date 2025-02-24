@@ -100,17 +100,8 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
         const provider = get().tappletProvider;
         const { methodName, args, id } = event.data;
         console.info(`🌎️ [TU store][run simulation] SIMULATION`, methodName, id, args);
+        console.info(`🌎️ [TU store][run simulation] provider & acc`, provider, account);
         try {
-            console.info(`🌎️ [TU store][run simulation] Run method "${methodName}"`);
-            if (!provider || !account)
-                return {
-                    balanceUpdates: [],
-                    txSimulation: {
-                        status: TransactionStatus.InvalidTransaction,
-                        errorMsg: 'Transaction result undefined',
-                    },
-                };
-            console.info(`🌎️ [TU store][run simulation] provider "${provider}"`);
             if (methodName !== 'submitTransaction') {
                 return {
                     balanceUpdates: [],
@@ -120,7 +111,17 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
                     },
                 };
             }
+            console.info(`🌎️ [TU store][run simulation] Run method "${methodName}"`);
+            if (!provider || !account)
+                return {
+                    balanceUpdates: [],
+                    txSimulation: {
+                        status: TransactionStatus.InvalidTransaction,
+                        errorMsg: 'Provider and/or account undefined',
+                    },
+                };
             const transactionReq: SubmitTransactionRequest = { ...args[0], is_dry_run: true };
+            console.info(`🌎️ [TU store][run simulation] tx req`, transactionReq);
             const tx = await provider?.runOne(methodName, [transactionReq]);
             await provider.client.waitForTransactionResult({
                 transaction_id: tx.transaction_id,
@@ -187,6 +188,13 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
         } catch (error) {
             console.error(`Error running method "${methodName}": ${error}`);
             appStateStore.setError(`Error running method "${methodName}": ${error}`);
+            return {
+                balanceUpdates: [],
+                txSimulation: {
+                    status: TransactionStatus.InvalidTransaction,
+                    errorMsg: `Error running method "${methodName}": ${error}`,
+                },
+            };
         }
     },
 }));

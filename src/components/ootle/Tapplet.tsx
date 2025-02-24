@@ -35,8 +35,11 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
             }
         } else if (event.data.type === 'provider-call') {
             console.info('🤝 [TU Tapplet][handle msg] event data:', event.data);
-            // runTappletTx(event);
-            runTappletTxSimulation(event);
+            if (event.data.methodName === 'submitTransaction') {
+                runTappletTxSimulation(event);
+                return;
+            }
+            runTappletTx(event);
         }
     }
 
