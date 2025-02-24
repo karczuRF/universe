@@ -11,6 +11,7 @@ import {
     RejectReason,
 } from '@tari-project/typescript-bindings';
 import { TappletProvider } from './TappletProvider';
+import { TransactionStatus } from '@tari-project/tarijs';
 
 export interface TransactionEvent {
     methodName: Exclude<keyof TappletProvider, 'runOne'>;
@@ -42,3 +43,8 @@ export const txCheck = {
         return 'Reject' in result;
     },
 };
+
+export interface TxSimulation {
+    status: TransactionStatus;
+    errorMsg: string;
+}

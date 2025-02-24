@@ -10,6 +10,7 @@ interface TappletProps {
 export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
     const tappletRef = useRef<HTMLIFrameElement | null>(null);
     const runTransaction = useTappletProviderStore((s) => s.runTransaction);
+    const runSimulation = useTappletProviderStore((s) => s.runSimulation);
 
     function sendWindowSize() {
         if (tappletRef.current) {
@@ -34,7 +35,8 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
             }
         } else if (event.data.type === 'provider-call') {
             console.info('🤝 [TU Tapplet][handle msg] event data:', event.data);
-            runTappletTx(event);
+            // runTappletTx(event);
+            runTappletTxSimulation(event);
         }
     }
 
@@ -43,6 +45,15 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
             await runTransaction(event);
         },
         [runTransaction]
+    );
+
+    const runTappletTxSimulation = useCallback(
+        async (event: MessageEvent) => {
+            const { balanceUpdates, txSimulation } = await runSimulation(event);
+            console.warn('SIIIIMULATION RES TX', txSimulation);
+            console.warn('SIIIIMULATION RES BALANCES', balanceUpdates);
+        },
+        [runSimulation]
     );
 
     useEffect(() => {
