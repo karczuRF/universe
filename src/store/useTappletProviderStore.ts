@@ -22,6 +22,7 @@ interface Actions {
     setTappletProvider: (id: string, launchedTapplet: ActiveTapplet) => Promise<void>;
     addTransaction: (event: MessageEvent<TransactionEvent>) => Promise<void>;
     getTransactionById: (id: number) => TUTransaction | undefined;
+    getPendingTransaction: () => TUTransaction | undefined;
     runSimulation: (id: number) => Promise<TxSimulationResult>;
     runTransaction: (event: MessageEvent<TransactionEvent>) => Promise<void>;
 }
@@ -120,6 +121,15 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
                 const walletBalances = await fetchWalletBalances(provider, account.address);
                 const balanceUpdates = calculateBalanceUpdates(txResult.result.Accept.up_substates, walletBalances);
 
+                if (txReceipt.status !== TransactionStatus.Accepted) {
+                    set((state) => ({
+                        transactions: state.transactions.map((tx) =>
+                            tx.id === id ? { ...tx, ...{ state: txReceipt.status } } : tx
+                        ),
+                    }));
+                    console.info(`🌎️🌎️🌎️ [TU store][run simulation] updated status`, get().transactions);
+                }
+
                 return { balanceUpdates, txSimulation, estimatedFee: txResult.fee_receipt.total_fees_paid };
             } catch (error) {
                 console.error(`Error running method "${methodName}": ${error}`);
@@ -151,6 +161,14 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
                     { targetOrigin: event.origin }
                 );
             }
+
+            // TODO fix
+            set((state) => ({
+                transactions: state.transactions.map((tx) =>
+                    tx.id === id ? { ...tx, ...{ state: TransactionStatus.Rejected } } : tx
+                ),
+            }));
+            console.info(`🌎️🌎️🌎️ [TU store][run simulation] updated status`, get().transactions);
         };
 
         try {
@@ -191,55 +209,13 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
             appStateStore.setError(`Error running method "${methodName}": ${error}`);
         }
     },
-    //     event: MessageEvent<TransactionEvent>
-    // ): Promise<{ balanceUpdates: BalanceUpdate[]; txSimulation: TxSimulation }> => {
-    //     const { methodName, args, id } = event.data;
-    //     const provider = get().tappletProvider;
-    //     const account = useOotleWalletStore.getState().ootleAccount;
-    //     const appStateStore = useAppStateStore.getState();
-    //     console.info(`🌎️🌎️🌎️ [TU store][run simulation] SIMULATION`, methodName, id, args);
-    //     console.info(`🌎️🌎️🌎️ [TU store][run simulation] provider & acc`, provider, account);
-    //     try {
-    //         if (methodName !== 'submitTransaction') {
-    //             return createInvalidTransactionResponse(`Simulation for ${methodName} not supported`);
-    //         }
 
-    //         console.info(`🌎️🌎️🌎️ [TU store][run simulation] Run method "${methodName}"`);
-    //         if (!provider || !account) {
-    //             return createInvalidTransactionResponse('Provider and/or account undefined');
-    //         }
-    //         const transactionReq: SubmitTransactionRequest = { ...args[0], is_dry_run: true };
-    //         console.info(`🌎️🌎️🌎️ [TU store][run simulation] tx req`, transactionReq);
-    //         const tx = await provider?.runOne(methodName, [transactionReq]);
-    //         await provider.client.waitForTransactionResult({
-    //             transaction_id: tx.transaction_id,
-    //             timeout_secs: 10,
-    //         });
-    //         const txReceipt = await provider.getTransactionResult(tx.transaction_id);
-    //         const txResult = txReceipt.result as FinalizeResult | null;
-    //         console.info(`🌎️🌎️🌎️ [TU store][run simulation] tx result`, txResult);
-    //         if (!txResult?.result) {
-    //             return createInvalidTransactionResponse('Transaction result undefined');
-    //         }
-
-    //         const txSimulation: TxSimulation = {
-    //             status: txReceipt.status,
-    //             errorMsg: txCheck.isReject(txResult?.result) ? (txResult.result.Reject as string) : '',
-    //         };
-    //         if (!txCheck.isAccept(txResult.result)) return { balanceUpdates: [], txSimulation };
-
-    //         const walletBalances = await fetchWalletBalances(provider, account.address);
-    //         const balanceUpdates = calculateBalanceUpdates(txResult.result.Accept.up_substates, walletBalances);
-
-    //         return { balanceUpdates, txSimulation };
-    //     } catch (error) {
-    //         console.error(`Error running method "${methodName}": ${error}`);
-    //         appStateStore.setError(`Error running method "${methodName}": ${error}`);
-    //         return createInvalidTransactionResponse(`Error running method "${methodName}": ${error}`);
-    //     }
-    // },
     getTransactionById: (id) => {
         return get().transactions.find((transaction) => transaction.id === id);
+    },
+    getPendingTransaction: () => {
+        console.log('TX pending', get().transactions);
+        return get().transactions.find((transaction) => transaction.status === 'pending');
     },
     runSimulation: async (id) => {
         const tx = get().transactions.find((transaction) => transaction.id === id);

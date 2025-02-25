@@ -1,4 +1,5 @@
 import { useTappletProviderStore } from '@app/store/useTappletProviderStore';
+import { useUIStore } from '@app/store/useUIStore';
 import { TappletProvider } from '@app/types/ootle/TappletProvider';
 import { useCallback, useEffect, useRef } from 'react';
 
@@ -12,6 +13,7 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
     const runTransaction = useTappletProviderStore((s) => s.runTransaction);
     const runSimulation = useTappletProviderStore((s) => s.runSimulation);
     const addTransaction = useTappletProviderStore((s) => s.addTransaction);
+    const setDialogToShow = useUIStore((s) => s.setDialogToShow);
 
     function sendWindowSize() {
         if (tappletRef.current) {
@@ -39,7 +41,8 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
             console.info('🤝 [TU Tapplet][handle msg] TX ADDED');
             if (event.data.methodName === 'submitTransaction') {
                 addTransaction(event);
-                runTappletTxSimulation(event);
+                setDialogToShow('txSimulation');
+                // runTappletTxSimulation(event);
                 return;
             }
             runTappletTx(event);
