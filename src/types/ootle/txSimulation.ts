@@ -17,21 +17,13 @@ export interface BalanceUpdate {
     tokenSymbol: string;
 }
 
-export interface SimulationRequestPayload {
-    transactionId: number;
-}
-export interface SimulationSuccessPayload {
-    transactionId: number;
-    balanceUpdates: BalanceUpdate[];
-    transaction: TxSimulation;
-}
-export interface SimulationFailurePayload {
-    transactionId: number;
-    errorMsg: string;
-    transaction: TxSimulation;
-}
-
 export interface TxSimulation {
     status: TransactionStatus;
-    errorMsg: string;
+    errorMsg?: string;
+}
+
+export interface TxSimulationResult {
+    balanceUpdates: BalanceUpdate[];
+    txSimulation: TxSimulation;
+    estimatedFee?: number;
 }

@@ -11,7 +11,8 @@ import {
     RejectReason,
 } from '@tari-project/typescript-bindings';
 import { TappletProvider } from './TappletProvider';
-import { TransactionStatus } from '@tari-project/tarijs';
+import { SubmitTransactionRequest } from '@tari-project/tarijs';
+import { BalanceUpdate, TxSimulation, TxSimulationResult } from './txSimulation';
 
 export interface TransactionEvent {
     methodName: Exclude<keyof TappletProvider, 'runOne'>;
@@ -46,9 +47,22 @@ export const txCheck = {
     isReject: (result: TransactionResult): result is { Reject: RejectReason } => {
         return 'Reject' in result;
     },
+    isAcceptFeeRejectRest: (
+        result: TransactionResult
+    ): result is { AcceptFeeRejectRest: [SubstateDiff, RejectReason] } => {
+        return 'AcceptFeeRejectRest' in result;
+    },
 };
 
-export interface TxSimulation {
-    status: TransactionStatus;
-    errorMsg: string;
+export type TxStatus = 'dryRun' | 'pending' | 'success' | 'failure' | 'cancelled';
+export type TappletProviderMethod = Exclude<keyof TappletProvider, 'runOne'>;
+
+export interface TUTransaction {
+    id: number;
+    methodName: TappletProviderMethod;
+    args: SubmitTransactionRequest[];
+    status: TxStatus;
+    submit: () => void;
+    cancel: () => void;
+    runSimulation: () => Promise<TxSimulationResult>;
 }

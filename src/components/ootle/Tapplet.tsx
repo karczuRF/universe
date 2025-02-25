@@ -11,6 +11,7 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
     const tappletRef = useRef<HTMLIFrameElement | null>(null);
     const runTransaction = useTappletProviderStore((s) => s.runTransaction);
     const runSimulation = useTappletProviderStore((s) => s.runSimulation);
+    const addTransaction = useTappletProviderStore((s) => s.addTransaction);
 
     function sendWindowSize() {
         if (tappletRef.current) {
@@ -35,7 +36,9 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
             }
         } else if (event.data.type === 'provider-call') {
             console.info('🤝 [TU Tapplet][handle msg] event data:', event.data);
+            console.info('🤝 [TU Tapplet][handle msg] TX ADDED');
             if (event.data.methodName === 'submitTransaction') {
+                addTransaction(event);
                 runTappletTxSimulation(event);
                 return;
             }
@@ -52,7 +55,8 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
 
     const runTappletTxSimulation = useCallback(
         async (event: MessageEvent) => {
-            const { balanceUpdates, txSimulation } = await runSimulation(event);
+            console.warn('SIIIIMULATION run TX');
+            const { balanceUpdates, txSimulation } = await runSimulation(event.data.id);
             console.warn('SIIIIMULATION RES TX', txSimulation);
             console.warn('SIIIIMULATION RES BALANCES', balanceUpdates);
         },
