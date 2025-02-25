@@ -20,13 +20,17 @@ export interface TransactionEvent {
     id: number;
 }
 
+function isOfType<T extends object>(obj: T, key: keyof T): boolean {
+    return obj !== null && typeof obj === 'object' && key in obj;
+}
+
 export const txCheck = {
     isAccept: (result: TransactionResult): result is { Accept: SubstateDiff } => {
         return 'Accept' in result;
     },
 
     isVaultId: (substateId: SubstateId): substateId is { Vault: VaultId } => {
-        return 'Vault' in substateId;
+        return isOfType(substateId, 'Vault' as keyof SubstateId);
     },
 
     isVaultSubstate: (substate: SubstateValue): substate is { Vault: Vault } => {
