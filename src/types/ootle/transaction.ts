@@ -54,14 +54,14 @@ export const txCheck = {
     },
 };
 
-export type TxStatus = 'dryRun' | 'pending' | 'success' | 'failure' | 'cancelled';
+export type TappletTxStatus = 'dryRun' | 'pending' | 'success' | 'failure' | 'cancelled';
 export type TappletProviderMethod = Exclude<keyof TappletProvider, 'runOne'>;
 
 export interface TUTransaction {
     id: number;
     methodName: TappletProviderMethod;
     args: SubmitTransactionRequest[];
-    status: TxStatus;
+    status: TappletTxStatus;
     submit: () => Promise<FinalizeResult | null>;
     cancel: () => void;
     runSimulation: () => Promise<TxSimulationResult>;

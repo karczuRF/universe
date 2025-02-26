@@ -13,7 +13,7 @@ import { BalanceUpdate, TxSimulation, TxSimulationResult } from '@app/types/ootl
 interface State {
     isInitialized: boolean;
     tappletProvider?: TappletProvider;
-    transactions: TUTransaction[];
+    transactions: Record<string, TUTransaction>;
 }
 
 //TODO do we need tapp provider id at all?
@@ -23,7 +23,6 @@ interface Actions {
     addTransaction: (event: MessageEvent<TransactionEvent>) => Promise<void>;
     getTransactionById: (id: number) => TUTransaction | undefined;
     getPendingTransaction: () => TUTransaction | undefined;
-    // runSimulation: (id: number) => Promise<TxSimulationResult>;
     runTransaction: (event: MessageEvent<TransactionEvent>) => Promise<void>;
 }
 
@@ -32,7 +31,7 @@ type TappletProviderStoreState = State & Actions;
 const initialState: State = {
     isInitialized: false,
     tappletProvider: undefined,
-    transactions: [],
+    transactions: {},
 };
 
 export const useTappletProviderStore = create<TappletProviderStoreState>()((set, get) => ({
@@ -126,9 +125,13 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
 
                 if (txReceipt.status !== TransactionStatus.Accepted) {
                     set((state) => ({
-                        transactions: state.transactions.map((tx) =>
-                            tx.id === id ? { ...tx, ...{ state: txReceipt.status } } : tx
-                        ),
+                        transactions: {
+                            ...state.transactions,
+                            [id]: {
+                                ...state.transactions[id],
+                                ...{ status: 'failure' },
+                            },
+                        },
                     }));
                     console.info(`🌎️🌎️🌎️ [TU store][run simulation] updated status`, get().transactions);
                 }
@@ -163,13 +166,16 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
                 const txResult = txReceipt.result as FinalizeResult | null;
                 console.info(`🌎️ [TU store][run tx] RESULT AND RECEIPT`, txReceipt, txResult);
                 set((state) => ({
-                    transactions: state.transactions.map((tx) =>
-                        tx.id === id ? { ...tx, ...{ state: txReceipt.status } } : tx
-                    ),
+                    transactions: {
+                        ...state.transactions,
+                        [id]: {
+                            ...state.transactions[id],
+                            ...{ status: txReceipt.status == TransactionStatus.Accepted ? 'success' : 'failure' },
+                        },
+                    },
                 }));
                 return txResult;
             } catch (error) {
-                // const appStateStore = useAppStateStore.getState();
                 console.error(`Error running method "${methodName}": ${error}`);
                 appStateStore.setError(`Error running method "${methodName}": ${error}`);
                 return null;
@@ -187,9 +193,13 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
             console.info(`🌎️🌎️🌎️ [TU store][CANCEL] ID`, id);
             // TODO fix
             set((state) => ({
-                transactions: state.transactions.map((tx) =>
-                    tx.id === id ? { ...tx, ...{ state: 'cancelled' } } : tx
-                ),
+                transactions: {
+                    ...state.transactions,
+                    [id]: {
+                        ...state.transactions[id],
+                        ...{ status: 'cancelled' },
+                    },
+                },
             }));
             console.info(`🌎️🌎️🌎️ [TU store][run simulation] updated status`, get().transactions);
         };
@@ -197,7 +207,7 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
         try {
             console.info(`🌎️ [TU store][init tx]`);
 
-            const newTx: TUTransaction = {
+            const newTransaction: TUTransaction = {
                 methodName,
                 args,
                 id,
@@ -208,9 +218,14 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
             };
             console.info(`🌎️🌎️🌎️  [TU store][init tx] TX ADDED ID`, id);
             // update state
-            const transactions = [...get().transactions, newTx];
-            set({ transactions });
-            console.info(`🌎️ [TU store][init tx] success`, transactions);
+            // const transactions = [...get().transactions, newTx];
+            set((state) => ({
+                transactions: {
+                    ...state.transactions,
+                    [id]: newTransaction,
+                },
+            }));
+            console.info(`🌎️ [TU store][init tx] success`, newTransaction);
         } catch (error) {
             // const appStateStore = useAppStateStore.getState();
             console.error('Error setting new transaction: ', error);
@@ -234,11 +249,15 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
     },
 
     getTransactionById: (id) => {
-        return get().transactions.find((transaction) => transaction.id === id);
+        return get().transactions[id];
     },
     getPendingTransaction: () => {
-        console.log('TX pending', get().transactions);
-        return get().transactions.find((transaction) => transaction.status === 'pending');
+        console.log('TX STORE', get().transactions);
+        const pendingTransaction = Object.values(get().transactions).find(
+            (transaction) => transaction.status === 'pending'
+        );
+        console.log('TX pending', pendingTransaction);
+        return pendingTransaction;
     },
     // runSimulation: async (id) => {
     //     const tx = get().transactions.find((transaction) => transaction.id === id);

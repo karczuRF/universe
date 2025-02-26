@@ -20,9 +20,10 @@ const TappletTransactionDialog = memo(function AutoUpdateDialog() {
     const handleClose = useCallback(() => {
         console.info('Tx cancelled');
         console.warn('Cancel TX', tx);
+        setMaxFee(0);
         setDialogToShow(null);
         if (!tx) return;
-        tx?.cancel();
+        tx.cancel();
     }, [setDialogToShow, tx]);
 
     const handleSubmit = useCallback(async () => {
@@ -39,14 +40,17 @@ const TappletTransactionDialog = memo(function AutoUpdateDialog() {
         } else {
             const result = await tx.submit();
             console.warn('TX submit result', result);
+            setMaxFee(0);
+            setDialogToShow(null);
         }
-    }, [maxFee, tx]);
+    }, [maxFee, setDialogToShow, tx]);
 
     return (
         <Dialog open={open} onOpenChange={handleClose} disableClose>
             <DialogContent>
                 <Typography variant="h3">{'Transaction'}</Typography>
-                <Typography variant="p">{maxFee}</Typography>
+                <Typography variant="p">{`Id ${tx?.id} fee: ${maxFee}`}</Typography>
+                <Typography variant="p">{`Status ${tx?.status}`}</Typography>
                 <ButtonsWrapper>
                     <>
                         <SquaredButton onClick={handleClose} color="warning">
