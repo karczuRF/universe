@@ -5,18 +5,15 @@ import { useUIStore } from '@app/store/useUIStore';
 import { DialogContent, Dialog } from '@app/components/elements/dialog/Dialog';
 import { SquaredButton } from '@app/components/elements/buttons/SquaredButton';
 import { Typography } from '@app/components/elements/Typography';
-import { memo, useCallback, useEffect, useState } from 'react';
-import { listen } from '@tauri-apps/api/event';
-import { ButtonsWrapper } from './TxSimulationDialog.styles';
+import { memo, useCallback, useState } from 'react';
+import { ButtonsWrapper } from './TappletTransactionDialog.styles';
 import { useTappletProviderStore } from '@app/store/useTappletProviderStore';
 
-const TxSimulationDialog = memo(function AutoUpdateDialog() {
-    const { t } = useTranslation('setup-view', { useSuspense: false });
+const TappletTransactionDialog = memo(function AutoUpdateDialog() {
+    const { t } = useTranslation('setup-view', { useSuspense: false }); //TODO add transaltion
     const open = useUIStore((s) => s.dialogToShow === 'txSimulation');
     const setDialogToShow = useUIStore((s) => s.setDialogToShow);
-    const [estimatedFee, setEstimatedFee] = useState(0);
-    const runTransaction = useTappletProviderStore((s) => s.runTransaction);
-    const runSimulation = useTappletProviderStore((s) => s.runSimulation);
+    const [maxFee, setMaxFee] = useState(0);
     const getPendingTransaction = useTappletProviderStore((s) => s.getPendingTransaction);
     const tx = getPendingTransaction();
 
@@ -29,27 +26,34 @@ const TxSimulationDialog = memo(function AutoUpdateDialog() {
     }, [setDialogToShow, tx]);
 
     const handleSubmit = useCallback(async () => {
-        console.info('Submit Tx');
-        console.warn('SIIIIMULATION run TX', tx);
+        const isDryRun = maxFee == 0;
+        console.warn('SUBMIT run TX', tx);
         if (!tx) return;
-        const { balanceUpdates, txSimulation, estimatedFee } = await tx.runSimulation();
-        console.warn('SIIIIMULATION RES TX', txSimulation);
-        console.warn('SIIIIMULATION RES BALANCES', balanceUpdates);
-        setEstimatedFee(estimatedFee ?? 0);
-    }, [tx]);
+        if (isDryRun) {
+            const { balanceUpdates, txSimulation, estimatedFee } = await tx.runSimulation();
+            console.warn('SIIIIMULATION RES TX', txSimulation);
+            if (estimatedFee) setMaxFee(estimatedFee);
+            console.warn('SIIIIMULATION RES BALANCES', balanceUpdates);
+            console.warn('SIIIIMULATION RES FEE', estimatedFee);
+            return;
+        } else {
+            const result = await tx.submit();
+            console.warn('TX submit result', result);
+        }
+    }, [maxFee, tx]);
 
     return (
         <Dialog open={open} onOpenChange={handleClose} disableClose>
             <DialogContent>
-                <Typography variant="h3">{'Tx simulation'}</Typography>
-                <Typography variant="p">{estimatedFee}</Typography>
+                <Typography variant="h3">{'Transaction'}</Typography>
+                <Typography variant="p">{maxFee}</Typography>
                 <ButtonsWrapper>
                     <>
                         <SquaredButton onClick={handleClose} color="warning">
                             {'Cancel'}
                         </SquaredButton>
                         <SquaredButton onClick={handleSubmit} color="green">
-                            {'Estimate fee'}
+                            {maxFee ? 'Submit' : 'Estimate fee'}
                         </SquaredButton>
                     </>
                 </ButtonsWrapper>
@@ -58,4 +62,4 @@ const TxSimulationDialog = memo(function AutoUpdateDialog() {
     );
 });
 
-export default TxSimulationDialog;
+export default TappletTransactionDialog;

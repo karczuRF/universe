@@ -11,8 +11,8 @@ import {
     RejectReason,
 } from '@tari-project/typescript-bindings';
 import { TappletProvider } from './TappletProvider';
-import { SubmitTransactionRequest } from '@tari-project/tarijs';
-import { BalanceUpdate, TxSimulation, TxSimulationResult } from './txSimulation';
+import { FinalizeResult, SubmitTransactionRequest } from '@tari-project/tarijs';
+import { TxSimulationResult } from './txSimulation';
 
 export interface TransactionEvent {
     methodName: Exclude<keyof TappletProvider, 'runOne'>;
@@ -62,7 +62,7 @@ export interface TUTransaction {
     methodName: TappletProviderMethod;
     args: SubmitTransactionRequest[];
     status: TxStatus;
-    submit: () => void;
+    submit: () => Promise<FinalizeResult | null>;
     cancel: () => void;
     runSimulation: () => Promise<TxSimulationResult>;
 }

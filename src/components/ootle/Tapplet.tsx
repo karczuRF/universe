@@ -11,7 +11,6 @@ interface TappletProps {
 export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
     const tappletRef = useRef<HTMLIFrameElement | null>(null);
     const runTransaction = useTappletProviderStore((s) => s.runTransaction);
-    const runSimulation = useTappletProviderStore((s) => s.runSimulation);
     const addTransaction = useTappletProviderStore((s) => s.addTransaction);
     const setDialogToShow = useUIStore((s) => s.setDialogToShow);
 
@@ -56,15 +55,15 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
         [runTransaction]
     );
 
-    const runTappletTxSimulation = useCallback(
-        async (event: MessageEvent) => {
-            console.warn('SIIIIMULATION run TX');
-            const { balanceUpdates, txSimulation } = await runSimulation(event.data.id);
-            console.warn('SIIIIMULATION RES TX', txSimulation);
-            console.warn('SIIIIMULATION RES BALANCES', balanceUpdates);
-        },
-        [runSimulation]
-    );
+    // const runTappletTxSimulation = useCallback(
+    //     async (event: MessageEvent) => {
+    //         console.warn('SIIIIMULATION run TX');
+    //         const { balanceUpdates, txSimulation } = await runSimulation(event.data.id);
+    //         console.warn('SIIIIMULATION RES TX', txSimulation);
+    //         console.warn('SIIIIMULATION RES BALANCES', balanceUpdates);
+    //     },
+    //     [runSimulation]
+    // );
 
     useEffect(() => {
         window.addEventListener('resize', sendWindowSize);

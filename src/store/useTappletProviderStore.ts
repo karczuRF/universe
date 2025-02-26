@@ -23,7 +23,7 @@ interface Actions {
     addTransaction: (event: MessageEvent<TransactionEvent>) => Promise<void>;
     getTransactionById: (id: number) => TUTransaction | undefined;
     getPendingTransaction: () => TUTransaction | undefined;
-    runSimulation: (id: number) => Promise<TxSimulationResult>;
+    // runSimulation: (id: number) => Promise<TxSimulationResult>;
     runTransaction: (event: MessageEvent<TransactionEvent>) => Promise<void>;
 }
 
@@ -82,22 +82,25 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
     },
     addTransaction: async (event: MessageEvent<TransactionEvent>) => {
         const { methodName, args, id } = event.data;
+        const provider = get().tappletProvider;
+        const appStateStore = useAppStateStore.getState();
+
         const runSimulation = async (): Promise<TxSimulationResult> => {
-            const { methodName, args, id } = event.data;
-            const provider = get().tappletProvider;
+            // const { methodName, args, id } = event.data;
+            // const provider = get().tappletProvider;
             const account = useOotleWalletStore.getState().ootleAccount;
             const appStateStore = useAppStateStore.getState();
             console.info(`🌎️🌎️🌎️ [TU store][run simulation] SIMULATION`, methodName, id, args);
             console.info(`🌎️🌎️🌎️ [TU store][run simulation] provider & acc`, provider, account);
             try {
+                if (!provider || !account) {
+                    return createInvalidTransactionResponse('Provider and/or account undefined');
+                }
                 if (methodName !== 'submitTransaction') {
                     return createInvalidTransactionResponse(`Simulation for ${methodName} not supported`);
                 }
 
                 console.info(`🌎️🌎️🌎️ [TU store][run simulation] Run method "${methodName}"`);
-                if (!provider || !account) {
-                    return createInvalidTransactionResponse('Provider and/or account undefined');
-                }
                 const transactionReq: SubmitTransactionRequest = { ...args[0], is_dry_run: true };
                 console.info(`🌎️🌎️🌎️ [TU store][run simulation] tx req`, transactionReq);
                 const tx = await provider?.runOne(methodName, [transactionReq]);
@@ -138,19 +141,38 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
             }
         };
 
-        const submit = async () => {
-            const { methodName, args, id } = event.data;
+        const submit = async (): Promise<FinalizeResult | null> => {
+            // const { methodName, args, id } = event.data;
             try {
-                const provider = get().tappletProvider;
+                console.info(`🌎️🌎️🌎️ [TU store][SUBMIT] ID`, id);
+                if (!provider) {
+                    appStateStore.setError(`Provider undefined`);
+                    return null;
+                }
+                // const provider = get().tappletProvider;
                 console.info(`🌎️ [TU store][run tx] Running method "${methodName}"`);
                 const result = await provider?.runOne(methodName, args);
                 if (event.source) {
                     event.source.postMessage({ id, result, type: 'provider-call' }, { targetOrigin: event.origin });
                 }
+                await provider.client.waitForTransactionResult({
+                    transaction_id: result.transaction_id,
+                    timeout_secs: 10,
+                });
+                const txReceipt = await provider.getTransactionResult(result.transaction_id);
+                const txResult = txReceipt.result as FinalizeResult | null;
+                console.info(`🌎️ [TU store][run tx] RESULT AND RECEIPT`, txReceipt, txResult);
+                set((state) => ({
+                    transactions: state.transactions.map((tx) =>
+                        tx.id === id ? { ...tx, ...{ state: txReceipt.status } } : tx
+                    ),
+                }));
+                return txResult;
             } catch (error) {
-                const appStateStore = useAppStateStore.getState();
+                // const appStateStore = useAppStateStore.getState();
                 console.error(`Error running method "${methodName}": ${error}`);
                 appStateStore.setError(`Error running method "${methodName}": ${error}`);
+                return null;
             }
         };
 
@@ -162,10 +184,11 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
                 );
             }
 
+            console.info(`🌎️🌎️🌎️ [TU store][CANCEL] ID`, id);
             // TODO fix
             set((state) => ({
                 transactions: state.transactions.map((tx) =>
-                    tx.id === id ? { ...tx, ...{ state: TransactionStatus.Rejected } } : tx
+                    tx.id === id ? { ...tx, ...{ state: 'cancelled' } } : tx
                 ),
             }));
             console.info(`🌎️🌎️🌎️ [TU store][run simulation] updated status`, get().transactions);
@@ -183,13 +206,13 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
                 cancel,
                 runSimulation,
             };
-
+            console.info(`🌎️🌎️🌎️  [TU store][init tx] TX ADDED ID`, id);
             // update state
             const transactions = [...get().transactions, newTx];
             set({ transactions });
             console.info(`🌎️ [TU store][init tx] success`, transactions);
         } catch (error) {
-            const appStateStore = useAppStateStore.getState();
+            // const appStateStore = useAppStateStore.getState();
             console.error('Error setting new transaction: ', error);
             appStateStore.setError(`Error setting new transaction: ${error}`);
         }
@@ -217,21 +240,21 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
         console.log('TX pending', get().transactions);
         return get().transactions.find((transaction) => transaction.status === 'pending');
     },
-    runSimulation: async (id) => {
-        const tx = get().transactions.find((transaction) => transaction.id === id);
-        console.log('TX SIMULATION RUN ID', tx);
-        if (!tx)
-            return {
-                balanceUpdates: [],
-                txSimulation: {
-                    status: TransactionStatus.InvalidTransaction,
-                    errorMsg: 'No tx found',
-                },
-            };
-        const { balanceUpdates, estimatedFee, txSimulation } = await tx.runSimulation();
-        console.log('TX SIMULATION', balanceUpdates, estimatedFee, txSimulation);
-        return { balanceUpdates, txSimulation, estimatedFee };
-    },
+    // runSimulation: async (id) => {
+    //     const tx = get().transactions.find((transaction) => transaction.id === id);
+    //     console.log('TX SIMULATION RUN ID', tx);
+    //     if (!tx)
+    //         return {
+    //             balanceUpdates: [],
+    //             txSimulation: {
+    //                 status: TransactionStatus.InvalidTransaction,
+    //                 errorMsg: 'No tx found',
+    //             },
+    //         };
+    //     const { balanceUpdates, estimatedFee, txSimulation } = await tx.runSimulation();
+    //     console.log('TX SIMULATION', balanceUpdates, estimatedFee, txSimulation);
+    //     return { balanceUpdates, txSimulation, estimatedFee };
+    // },
 }));
 
 const createInvalidTransactionResponse = (errorMsg: string) => ({
