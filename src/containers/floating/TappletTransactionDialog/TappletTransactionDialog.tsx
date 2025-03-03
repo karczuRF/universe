@@ -7,14 +7,14 @@ import { SquaredButton } from '@app/components/elements/buttons/SquaredButton';
 import { Typography } from '@app/components/elements/Typography';
 import { memo, useCallback, useState } from 'react';
 import { ButtonsWrapper } from './TappletTransactionDialog.styles';
-import { useTappletProviderStore } from '@app/store/useTappletProviderStore';
+import { useTappletSignerStore } from '@app/store/useTappletSignerStore';
 
 const TappletTransactionDialog = memo(function AutoUpdateDialog() {
     const { t } = useTranslation('setup-view', { useSuspense: false }); //TODO add transaltion
     const open = useUIStore((s) => s.dialogToShow === 'txSimulation');
     const setDialogToShow = useUIStore((s) => s.setDialogToShow);
     const [maxFee, setMaxFee] = useState(0);
-    const getPendingTransaction = useTappletProviderStore((s) => s.getPendingTransaction);
+    const getPendingTransaction = useTappletSignerStore((s) => s.getPendingTransaction);
     const tx = getPendingTransaction();
 
     const handleClose = useCallback(() => {

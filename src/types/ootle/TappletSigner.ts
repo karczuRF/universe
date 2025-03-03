@@ -36,24 +36,24 @@ export interface WindowSize {
     height: number;
 }
 
-export interface TappletProviderParams {
+export interface TappletSignerParams {
     id: string;
     permissions: TappletPermissions;
     name?: string;
     onConnection?: () => void;
 }
 
-export type TappletProviderMethod = Exclude<keyof TappletProvider, 'runOne'>;
+export type TappletSignerMethod = Exclude<keyof TappletSigner, 'runOne'>;
 
-export class TappletProvider implements TariSigner {
+export class TappletSigner implements TariSigner {
     public signerName = 'TappletSigner';
     id: string;
-    params: TappletProviderParams;
+    params: TappletSignerParams;
     client: WalletDaemonClient;
     isProviderConnected: boolean;
 
     private constructor(
-        params: TappletProviderParams,
+        params: TappletSignerParams,
         connection: WalletDaemonClient,
         public width = 0,
         public height = 0
@@ -64,9 +64,9 @@ export class TappletProvider implements TariSigner {
         this.id = params.id;
     }
 
-    static build(params: TappletProviderParams): TappletProvider {
+    static build(params: TappletSignerParams): TappletSigner {
         const client = WalletDaemonClient.new(new IPCRpcTransport());
-        return new TappletProvider(params, client);
+        return new TappletSigner(params, client);
     }
     public setWindowSize(width: number, height: number): void {
         this.width = width;
@@ -77,8 +77,8 @@ export class TappletProvider implements TariSigner {
         tappletWindow?.postMessage({ height: this.height, width: this.width, type: 'resize' }, targetOrigin);
     }
     /* eslint-disable @typescript-eslint/no-explicit-any */
-    async runOne(method: TappletProviderMethod, args: any[]): Promise<any> {
-        console.info('[TU][TappletProvider] runOne', method);
+    async runOne(method: any, args: any[]): Promise<any> {
+        console.info('[TU][TappletSigner] runOne', method);
         const res = (this[method] as (...args: any) => Promise<any>)(...args);
         return res;
     }

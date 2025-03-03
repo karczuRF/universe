@@ -1,5 +1,5 @@
 import { create } from './create.ts';
-import { useTappletProviderStore } from './useTappletProviderStore.ts';
+import { useTappletSignerStore } from './useTappletSignerStore.ts';
 import { OotleAccount } from '@app/types/ootle/account.ts';
 import { AccountInfo } from '@tari-project/typescript-bindings';
 
@@ -25,7 +25,7 @@ const initialState: State = {
 export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
     ...initialState,
     createAccount: async (name: string) => {
-        const provider = useTappletProviderStore.getState().tappletProvider;
+        const provider = useTappletSignerStore.getState().tappletProvider;
         try {
             if (!provider) {
                 return;
@@ -45,7 +45,7 @@ export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
         }
     },
     setDefaultAccount: async (name: string) => {
-        const provider = useTappletProviderStore.getState().tappletProvider;
+        const provider = useTappletSignerStore.getState().tappletProvider;
         try {
             if (!provider) {
                 return;
@@ -62,7 +62,7 @@ export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
         }
     },
     getOotleAccountInfo: async () => {
-        const provider = useTappletProviderStore.getState().tappletProvider;
+        const provider = useTappletSignerStore.getState().tappletProvider;
         try {
             if (!provider) {
                 return;
@@ -78,7 +78,7 @@ export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
         }
     },
     getOotleAccountsList: async () => {
-        const provider = useTappletProviderStore.getState().tappletProvider;
+        const provider = useTappletSignerStore.getState().tappletProvider;
         try {
             if (!provider) {
                 return;

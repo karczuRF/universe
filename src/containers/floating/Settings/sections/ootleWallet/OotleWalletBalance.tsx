@@ -4,7 +4,7 @@ import { Typography } from '@app/components/elements/Typography';
 
 import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect } from 'react';
-import { useTappletProviderStore } from '@app/store/useTappletProviderStore';
+import { useTappletSignerStore } from '@app/store/useTappletSignerStore';
 
 import { Stack } from '@app/components/elements/Stack';
 import { CardContainer, ConnectionIcon } from '../../components/Settings.styles';
@@ -16,9 +16,9 @@ import { shortenSubstateAddress } from '@app/utils';
 const OotleWalletBalance = () => {
     const { t } = useTranslation(['settings', 'ootle'], { useSuspense: false });
 
-    const tappProvider = useTappletProviderStore((s) => s.tappletProvider);
-    const isTappProviderInitialized = useTappletProviderStore((s) => s.isInitialized);
-    const initTappletProvider = useTappletProviderStore((s) => s.initTappletProvider);
+    const tappProvider = useTappletSignerStore((s) => s.tappletProvider);
+    const isTappProviderInitialized = useTappletSignerStore((s) => s.isInitialized);
+    const initTappletSigner = useTappletSignerStore((s) => s.initTappletSigner);
     const ootleAccount = useOotleWalletStore((s) => s.ootleAccount);
     const ootleAccountsList = useOotleWalletStore((s) => s.ootleAccountsList);
     const getOotleAccountInfo = useOotleWalletStore((s) => s.getOotleAccountInfo);
@@ -28,13 +28,13 @@ const OotleWalletBalance = () => {
     const refreshProvider = useCallback(async () => {
         try {
             if (!tappProvider) {
-                await initTappletProvider();
+                await initTappletSigner();
                 return;
             }
         } catch (error) {
             console.error(error);
         }
-    }, [tappProvider, initTappletProvider]);
+    }, [tappProvider, initTappletSigner]);
 
     const refreshAccount = useCallback(async () => {
         try {

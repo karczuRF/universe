@@ -1,17 +1,17 @@
-import { useTappletProviderStore } from '@app/store/useTappletProviderStore';
+import { useTappletSignerStore } from '@app/store/useTappletSignerStore';
 import { useUIStore } from '@app/store/useUIStore';
-import { TappletProvider } from '@app/types/ootle/TappletProvider';
+import { TappletSigner } from '@app/types/ootle/TappletSigner';
 import { useCallback, useEffect, useRef } from 'react';
 
 interface TappletProps {
     source: string;
-    provider?: TappletProvider;
+    provider?: TappletSigner;
 }
 
 export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
     const tappletRef = useRef<HTMLIFrameElement | null>(null);
-    const runTransaction = useTappletProviderStore((s) => s.runTransaction);
-    const addTransaction = useTappletProviderStore((s) => s.addTransaction);
+    const runTransaction = useTappletSignerStore((s) => s.runTransaction);
+    const addTransaction = useTappletSignerStore((s) => s.addTransaction);
     const setDialogToShow = useUIStore((s) => s.setDialogToShow);
 
     function sendWindowSize() {

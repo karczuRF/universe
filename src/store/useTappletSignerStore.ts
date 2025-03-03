@@ -1,7 +1,7 @@
 import { create } from './create.ts';
 import { ActiveTapplet } from '@app/types/ootle/tapplet.ts';
 import { useAppStateStore } from './appStateStore.ts';
-import { TappletProvider, TappletProviderParams } from '@app/types/ootle/TappletProvider.ts';
+import { TappletSigner, TappletSignerParams } from '@app/types/ootle/TappletSigner.ts';
 import { TransactionEvent, TUTransaction, txCheck } from '@app/types/ootle/transaction.ts';
 import {
     FinalizeResult,
@@ -17,21 +17,21 @@ import { createPermissionFromType } from '@tari-project/tari-permissions';
 
 interface State {
     isInitialized: boolean;
-    tappletProvider?: TappletProvider;
+    tappletProvider?: TappletSigner;
     transactions: Record<string, TUTransaction>;
 }
 
 //TODO do we need tapp provider id at all?
 interface Actions {
-    initTappletProvider: () => Promise<void>;
-    setTappletProvider: (id: string, launchedTapplet: ActiveTapplet) => Promise<void>;
+    initTappletSigner: () => Promise<void>;
+    setTappletSigner: (id: string, launchedTapplet: ActiveTapplet) => Promise<void>;
     addTransaction: (event: MessageEvent<TransactionEvent>) => Promise<void>;
     getTransactionById: (id: number) => TUTransaction | undefined;
     getPendingTransaction: () => TUTransaction | undefined;
     runTransaction: (event: MessageEvent<TransactionEvent>) => Promise<void>;
 }
 
-type TappletProviderStoreState = State & Actions;
+type TappletSignerStoreState = State & Actions;
 
 const initialState: State = {
     isInitialized: false,
@@ -39,17 +39,17 @@ const initialState: State = {
     transactions: {},
 };
 
-export const useTappletProviderStore = create<TappletProviderStoreState>()((set, get) => ({
+export const useTappletSignerStore = create<TappletSignerStoreState>()((set, get) => ({
     ...initialState,
-    initTappletProvider: async () => {
+    initTappletSigner: async () => {
         try {
             console.info(`🌎️ [TU store][init provider]`);
 
-            const params: TappletProviderParams = {
+            const params: TappletSignerParams = {
                 id: '0',
                 permissions: { requiredPermissions: [], optionalPermissions: [] },
             };
-            const provider: TappletProvider = TappletProvider.build(params);
+            const provider: TappletSigner = TappletSigner.build(params);
 
             set({ isInitialized: true, tappletProvider: provider });
         } catch (error) {
@@ -58,7 +58,7 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
             appStateStore.setError(`Error setting tapplet provider: ${error}`);
         }
     },
-    setTappletProvider: async (id: string, launchedTapplet: ActiveTapplet) => {
+    setTappletSigner: async (id: string, launchedTapplet: ActiveTapplet) => {
         try {
             // TODO tmp solution
             const requiredPermissions = new TariPermissions();
@@ -71,11 +71,11 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
                     optionalPermissions.addPermission(createPermissionFromType(p))
                 );
             }
-            const params: TappletProviderParams = {
+            const params: TappletSignerParams = {
                 id,
                 permissions: launchedTapplet.permissions ?? { requiredPermissions: [], optionalPermissions: [] },
             };
-            const provider: TappletProvider = TappletProvider.build(params);
+            const provider: TappletSigner = TappletSigner.build(params);
 
             set({ isInitialized: true, tappletProvider: provider });
         } catch (error) {
@@ -101,10 +101,10 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
                     return createInvalidTransactionResponse('Provider and/or account undefined');
                 }
                 if (methodName !== 'submitTransaction') {
-                    return createInvalidTransactionResponse(`Simulation for ${methodName} not supported`);
+                    return createInvalidTransactionResponse(`Simulation for ${String(methodName)} not supported`);
                 }
 
-                console.info(`🌎️🌎️🌎️ [TU store][run simulation] Run method "${methodName}"`);
+                console.info(`🌎️🌎️🌎️ [TU store][run simulation] Run method "${String(methodName)}"`);
                 const transactionReq: SubmitTransactionRequest = { ...args[0], is_dry_run: true };
                 console.info(`🌎️🌎️🌎️ [TU store][run simulation] tx req`, transactionReq);
                 const tx = await provider?.runOne(methodName, [transactionReq]);
@@ -143,9 +143,9 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
 
                 return { balanceUpdates, txSimulation, estimatedFee: txResult.fee_receipt.total_fees_paid };
             } catch (error) {
-                console.error(`Error running method "${methodName}": ${error}`);
-                appStateStore.setError(`Error running method "${methodName}": ${error}`);
-                return createInvalidTransactionResponse(`Error running method "${methodName}": ${error}`);
+                console.error(`Error running method "${String(methodName)}": ${error}`);
+                appStateStore.setError(`Error running method "${String(methodName)}": ${error}`);
+                return createInvalidTransactionResponse(`Error running method "${String(methodName)}": ${error}`);
             }
         };
 
@@ -158,7 +158,7 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
                     return null;
                 }
                 // const provider = get().tappletProvider;
-                console.info(`🌎️ [TU store][run tx] Running method "${methodName}"`);
+                console.info(`🌎️ [TU store][run tx] Running method "${String(methodName)}"`);
                 const result = await provider?.runOne(methodName, args);
                 if (event.source) {
                     event.source.postMessage({ id, result, type: 'signer-call' }, { targetOrigin: event.origin });
@@ -181,8 +181,8 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
                 }));
                 return txResult;
             } catch (error) {
-                console.error(`Error running method "${methodName}": ${error}`);
-                appStateStore.setError(`Error running method "${methodName}": ${error}`);
+                console.error(`Error running method "${String(methodName)}": ${error}`);
+                appStateStore.setError(`Error running method "${String(methodName)}": ${error}`);
                 return null;
             }
         };
@@ -241,15 +241,15 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
         const { methodName, args, id } = event.data;
         try {
             const provider = get().tappletProvider;
-            console.info(`🌎️ [TU store][run tx] Running method "${methodName}"`);
+            console.info(`🌎️ [TU store][run tx] Running method "${String(methodName)}"`);
             const result = await provider?.runOne(methodName, args);
             if (event.source) {
                 event.source.postMessage({ id, result, type: 'signer-call' }, { targetOrigin: event.origin });
             }
         } catch (error) {
             const appStateStore = useAppStateStore.getState();
-            console.error(`Error running method "${methodName}": ${error}`);
-            appStateStore.setError(`Error running method "${methodName}": ${error}`);
+            console.error(`Error running method "${String(methodName)}": ${error}`);
+            appStateStore.setError(`Error running method "${String(methodName)}": ${error}`);
         }
     },
 
@@ -289,10 +289,7 @@ const createInvalidTransactionResponse = (errorMsg: string) => ({
     },
 });
 
-const fetchWalletBalances = async (
-    provider: TappletProvider,
-    address: string
-): Promise<AccountsGetBalancesResponse> => {
+const fetchWalletBalances = async (provider: TappletSigner, address: string): Promise<AccountsGetBalancesResponse> => {
     try {
         return await provider.getAccountBalances(address);
     } catch (error) {

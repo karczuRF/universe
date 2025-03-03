@@ -15,4 +15,4 @@ export type {
     TappletVersion,
 } from './tapplet';
 export type { TransactionEvent, txCheck } from './transaction';
-export type { TappletProvider, TappletProviderMethod, TappletProviderParams } from './TappletProvider';
+export type { TappletSigner, TappletSignerMethod, TappletSignerParams } from './TappletSigner';
