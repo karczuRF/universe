@@ -12,9 +12,7 @@ export type {
     SupportedChain,
     TappletAudit,
     TappletConfig,
-    TappletPermissions,
     TappletVersion,
 } from './tapplet';
 export type { TransactionEvent, txCheck } from './transaction';
 export type { TappletProvider, TappletProviderMethod, TappletProviderParams } from './TappletProvider';
-export { toPermission } from './tariPermissions';

@@ -12,13 +12,14 @@ import {
     SubmitTransactionRequest,
     SubmitTransactionResponse,
     Substate,
-    TariProvider,
+    TariSigner,
     TemplateDefinition,
     TransactionResult,
     TransactionStatus,
     VaultBalances,
 } from '@tari-project/tarijs';
-import type { ListSubstatesResponse } from '@tari-project/tari-provider';
+import { IPCRpcTransport } from './ipc_transport';
+import { OotleAccount } from './account';
 import {
     AccountSetDefaultResponse,
     ComponentAccessRules,
@@ -27,9 +28,8 @@ import {
     PublishTemplateResponse,
     SubstateType,
 } from '@tari-project/typescript-bindings';
-import { TappletPermissions } from './tapplet';
-import { IPCRpcTransport } from './ipc_transport';
-import { OotleAccount } from './account';
+import { ListSubstatesResponse } from '../../../../tari.js/packages/tari_signer/dist';
+import { TappletPermissions } from '@tari-project/tari-permissions';
 
 export interface WindowSize {
     width: number;
@@ -45,8 +45,8 @@ export interface TappletProviderParams {
 
 export type TappletProviderMethod = Exclude<keyof TappletProvider, 'runOne'>;
 
-export class TappletProvider implements TariProvider {
-    public providerName = 'TappletProvider';
+export class TappletProvider implements TariSigner {
+    public signerName = 'TappletSigner';
     id: string;
     params: TappletProviderParams;
     client: WalletDaemonClient;

@@ -2,13 +2,18 @@ import { create } from './create.ts';
 import { ActiveTapplet } from '@app/types/ootle/tapplet.ts';
 import { useAppStateStore } from './appStateStore.ts';
 import { TappletProvider, TappletProviderParams } from '@app/types/ootle/TappletProvider.ts';
-import { toPermission } from '@app/types/ootle/tariPermissions.ts';
 import { TransactionEvent, TUTransaction, txCheck } from '@app/types/ootle/transaction.ts';
-import { TariPermissions } from '@tari-project/tari-permissions';
-import { FinalizeResult, SubmitTransactionRequest, TransactionStatus, UpSubstates } from '@tari-project/tarijs';
+import {
+    FinalizeResult,
+    SubmitTransactionRequest,
+    TariPermissions,
+    TransactionStatus,
+    UpSubstates,
+} from '@tari-project/tarijs';
 import { useOotleWalletStore } from './useOotleWalletStore.ts';
-import { AccountsGetBalancesResponse } from '@tari-project/typescript-bindings';
 import { BalanceUpdate, TxSimulation, TxSimulationResult } from '@app/types/ootle/txSimulation.ts';
+import { AccountsGetBalancesResponse } from '@tari-project/typescript-bindings';
+import { createPermissionFromType } from '@tari-project/tari-permissions';
 
 interface State {
     isInitialized: boolean;
@@ -60,10 +65,10 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
             const optionalPermissions = new TariPermissions();
             if (launchedTapplet.permissions) {
                 launchedTapplet.permissions.requiredPermissions.map((p) =>
-                    requiredPermissions.addPermission(toPermission(p))
+                    requiredPermissions.addPermission(createPermissionFromType(p))
                 );
                 launchedTapplet.permissions.optionalPermissions.map((p) =>
-                    optionalPermissions.addPermission(toPermission(p))
+                    optionalPermissions.addPermission(createPermissionFromType(p))
                 );
             }
             const params: TappletProviderParams = {
@@ -156,7 +161,7 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
                 console.info(`🌎️ [TU store][run tx] Running method "${methodName}"`);
                 const result = await provider?.runOne(methodName, args);
                 if (event.source) {
-                    event.source.postMessage({ id, result, type: 'provider-call' }, { targetOrigin: event.origin });
+                    event.source.postMessage({ id, result, type: 'signer-call' }, { targetOrigin: event.origin });
                 }
                 await provider.client.waitForTransactionResult({
                     transaction_id: result.transaction_id,
@@ -185,7 +190,7 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
         const cancel = async () => {
             if (event.source) {
                 event.source.postMessage(
-                    { id, result: {}, resultError: 'Transaction was cancelled', type: 'provider-call' },
+                    { id, result: {}, resultError: 'Transaction was cancelled', type: 'signer-call' },
                     { targetOrigin: event.origin }
                 );
             }
@@ -239,7 +244,7 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
             console.info(`🌎️ [TU store][run tx] Running method "${methodName}"`);
             const result = await provider?.runOne(methodName, args);
             if (event.source) {
-                event.source.postMessage({ id, result, type: 'provider-call' }, { targetOrigin: event.origin });
+                event.source.postMessage({ id, result, type: 'signer-call' }, { targetOrigin: event.origin });
             }
         } catch (error) {
             const appStateStore = useAppStateStore.getState();
