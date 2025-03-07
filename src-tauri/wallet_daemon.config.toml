@@ -78,10 +78,8 @@ peer_seeds = [
 [igor.p2p.seeds]
 # DNS seeds hosts - DNS TXT records are queried from these hosts and the resulting peers added to the comms peer list.
 dns_seeds = []
-# Custom specified peer seed nodes
-peer_seeds = [
-    "921f9248b3e4a2b72c8b702a4ed8cc779a6301fe241eaf470065e51531cb5162::/ip4/18.217.22.26/tcp/12000"
-]
+# Custom specified peer seed nodes (Default: peer_seeds = [])
+peer_seeds = ["4aae3f97d22a3b918487ef8c26c3d3f3fbfc6bb65a0e464d12de983bf95da015::/ip4/18.217.22.26/tcp/12000"]
 # peer_seeds = [
 #     # 2222bb888618d65d7b16e355f9
 #     "8e7eb81e512f3d6347bf9b1ca9cd67d2c8e29f2836fc5bd608206505cc72af34::/ip6/fd56:2026:93c0:0:9e:96fb:e119:d8ec/tcp/18189",

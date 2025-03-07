@@ -6,7 +6,7 @@ import { useTappletsStore } from '@app/store/useTappletsStore';
 import { HeaderContainer } from './styles';
 
 export default function ActiveTappletView() {
-    const tappProvider = useTappletSignerStore((s) => s.tappletProvider);
+    const tappProvider = useTappletSignerStore((s) => s.tappletSigner);
     const tapplet = useTappletsStore((s) => s.activeTapplet);
     const deactivateTapplet = useTappletsStore((s) => s.deactivateTapplet);
 

@@ -2299,7 +2299,8 @@ pub async fn set_ootle_node_enabled<'r>(
 pub async fn upload_wasm_file(file: String, app: tauri::AppHandle) -> Result<(), String> {
     let _progress_tracker = ProgressTracker::new(app.clone(), None); //TODO add if needed?
     let file_path = PathBuf::from(file);
-    let jrpc_url = "http://localhost:18000"; //TODO get from config
+    // let jrpc_url = "http://localhost:18000"; //TODO get from config
+    let jrpc_url = "http://18.217.22.26:8080"; //TODO get from config
     let url = format!("{}/upload_template", jrpc_url);
     let wasm_name = file_path
         .file_stem()

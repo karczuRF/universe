@@ -53,6 +53,8 @@ pub async fn setup_tokens(app: tauri::AppHandle) -> Result<(), Box<dyn std::erro
     let tokens = app.state::<Tokens>();
     let (permission_token, auth_token) = try_get_tokens(Some(jrpc_port)).await;
     info!(target: LOG_TARGET, "🚀 Tokens setup successfully");
+    info!(target: LOG_TARGET, "🚀 permission {}", permission_token);
+    info!(target: LOG_TARGET, "🚀 auth {}", auth_token);
     tokens
         .permission
         .lock()

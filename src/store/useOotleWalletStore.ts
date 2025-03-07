@@ -25,7 +25,7 @@ const initialState: State = {
 export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
     ...initialState,
     createAccount: async (name: string) => {
-        const provider = useTappletSignerStore.getState().tappletProvider;
+        const provider = useTappletSignerStore.getState().tappletSigner;
         try {
             if (!provider) {
                 return;
@@ -45,7 +45,7 @@ export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
         }
     },
     setDefaultAccount: async (name: string) => {
-        const provider = useTappletSignerStore.getState().tappletProvider;
+        const provider = useTappletSignerStore.getState().tappletSigner;
         try {
             if (!provider) {
                 return;
@@ -62,7 +62,7 @@ export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
         }
     },
     getOotleAccountInfo: async () => {
-        const provider = useTappletSignerStore.getState().tappletProvider;
+        const provider = useTappletSignerStore.getState().tappletSigner;
         try {
             if (!provider) {
                 return;
@@ -78,7 +78,7 @@ export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
         }
     },
     getOotleAccountsList: async () => {
-        const provider = useTappletSignerStore.getState().tappletProvider;
+        const provider = useTappletSignerStore.getState().tappletSigner;
         try {
             if (!provider) {
                 return;

@@ -1,5 +1,4 @@
 import {
-    WalletDaemonClient,
     stringToSubstateId,
     substateIdToString,
     KeyBranch,
@@ -9,6 +8,7 @@ import {
 } from '@tari-project/wallet_jrpc_client';
 import {
     Account,
+    convertStringToTransactionStatus,
     SubmitTransactionRequest,
     SubmitTransactionResponse,
     Substate,
@@ -24,12 +24,16 @@ import {
     AccountSetDefaultResponse,
     ComponentAccessRules,
     Instruction,
+    ListAccountNftRequest,
+    ListAccountNftResponse,
+    NonFungibleToken,
     PublishTemplateRequest,
     PublishTemplateResponse,
     SubstateType,
 } from '@tari-project/typescript-bindings';
 import { ListSubstatesResponse } from '../../../../tari.js/packages/tari_signer/dist';
 import { TappletPermissions } from '@tari-project/tari-permissions';
+import { TUWalletDaemonClient } from '@tari-project/tari-universe-signer';
 
 export interface WindowSize {
     width: number;
@@ -49,12 +53,12 @@ export class TappletSigner implements TariSigner {
     public signerName = 'TappletSigner';
     id: string;
     params: TappletSignerParams;
-    client: WalletDaemonClient;
+    client: TUWalletDaemonClient;
     isProviderConnected: boolean;
 
     private constructor(
         params: TappletSignerParams,
-        connection: WalletDaemonClient,
+        connection: TUWalletDaemonClient,
         public width = 0,
         public height = 0
     ) {
@@ -65,7 +69,7 @@ export class TappletSigner implements TariSigner {
     }
 
     static build(params: TappletSignerParams): TappletSigner {
-        const client = WalletDaemonClient.new(new IPCRpcTransport());
+        const client = TUWalletDaemonClient.new(new IPCRpcTransport());
         return new TappletSigner(params, client);
     }
     public setWindowSize(width: number, height: number): void {
@@ -87,7 +91,7 @@ export class TappletSigner implements TariSigner {
         return this.isProviderConnected; //TODO tmp solution shoule be better one
     }
 
-    public async getClient(): Promise<WalletDaemonClient> {
+    public async getClient(): Promise<TUWalletDaemonClient> {
         return this.client;
     }
 
@@ -136,6 +140,52 @@ export class TappletSigner implements TariSigner {
         const { account, public_key } = await this.client.accountsGetDefault({});
         console.info('🔌 [TU][Provider] getAccount with accountsGetDefault', account, public_key);
 
+        //TODO JUST TMP CHECKER
+        console.log('🛜 [TU][signer] nfts_list acc', account);
+        const res = await this.client.nftsList({
+            account: { ComponentAddress: substateIdToString(account.address) },
+            limit: 20,
+            offset: 0,
+        });
+
+        console.info('🛜 [TU][signer] nfts_list response', res);
+
+        //TODO JUST TMP CHECKER
+        // try {
+        //     const resp = await this.client.get_nft({
+        //         nft_id: {
+        //             String: 'nft_8b9346033e3b8d283f1ff4a446873f529907c5baf18366ba816b589cb796621e_uuid_0816d48fb68796f1f91d85f47de6877880786c003f33b14f0ef99f05b9e82d77'.toString(),
+        //         },
+        //     });
+        //     console.info('🛜 [TU][signer] get_Nft response', resp);
+        // } catch (e) {
+        //     console.error('🛜 Failed to get nft with get_nft: ', e);
+        // }
+        // const nftid =
+        //     'nft_8b9346033e3b8d283f1ff4a446873f529907c5baf18366ba816b589cb796621e_uuid_0816d48fb68796f1f91d85f47de6877880786c003f33b14f0ef99f05b9e82d77';
+        // console.info('🛜🛜🛜🛜🛜 [TU][signer] typeof nftid', typeof nftid);
+
+        const subst = 'vault_042d0b62dc93f2cdcbdec0103d9eb902a176e80c31f3a497c244a698ff48db53';
+        try {
+            const respGetSubR = await this.client.substatesGet({
+                substate_id: subst,
+            });
+            console.info('🛜 [TU][signer] get_substate reso response', respGetSubR);
+        } catch (e) {
+            console.error('🛜 Failed to get nft with get_substate resource : ', e);
+        }
+
+        try {
+            const respGetSubNft = await this.client.nftsListWithData({
+                account: { ComponentAddress: substateIdToString(account.address) },
+                limit: 20,
+                offset: 0,
+            });
+            console.info('🛜 [TU][signer] nft_list_with_data response', respGetSubNft);
+        } catch (e) {
+            console.error('🛜 Failed to nft_list_with_data : ', e, subst);
+        }
+
         // TODO tip: if fails try `account: { ComponentAddress: account.address }`
         const { balances } = await this.client.accountsGetBalances({
             account: { ComponentAddress: substateIdToString(account.address) },
@@ -183,7 +233,7 @@ export class TappletSigner implements TariSigner {
 
     public async getSubstate(substate_id: string): Promise<Substate> {
         const substateId = stringToSubstateId(substate_id);
-        const { value, record } = await this.client.substatesGet({ substate_id: substateId });
+        const { value, record } = await this.client.substatesGet({ substate_id });
         return {
             value,
             address: {
@@ -286,25 +336,37 @@ export class TappletSigner implements TariSigner {
     public async transactionsPublishTemplate(request: PublishTemplateRequest): Promise<PublishTemplateResponse> {
         return await this.client.publishTemplate(request);
     }
-}
 
-function convertStringToTransactionStatus(status: string): TransactionStatus {
-    switch (status) {
-        case 'New':
-            return TransactionStatus.New;
-        case 'DryRun':
-            return TransactionStatus.DryRun;
-        case 'Pending':
-            return TransactionStatus.Pending;
-        case 'Accepted':
-            return TransactionStatus.Accepted;
-        case 'Rejected':
-            return TransactionStatus.Rejected;
-        case 'InvalidTransaction':
-            return TransactionStatus.InvalidTransaction;
-        case 'OnlyFeeAccepted':
-            return TransactionStatus.OnlyFeeAccepted;
-        default:
-            throw new Error(`Unknown status: ${status}`);
+    public async getNftsList({ account, limit, offset }: ListAccountNftRequest): Promise<ListAccountNftResponse> {
+        console.log('🛜 [TU][signer] get Nfts list', account, limit, offset);
+        const res = await this.client.nftsList({
+            account,
+            limit,
+            offset,
+        });
+
+        console.log('🛜 [TU][signer] get Nfts list response', res);
+        return res;
     }
 }
+
+// function convertStringToTransactionStatus(status: string): TransactionStatus {
+//     switch (status) {
+//         case 'New':
+//             return TransactionStatus.New;
+//         case 'DryRun':
+//             return TransactionStatus.DryRun;
+//         case 'Pending':
+//             return TransactionStatus.Pending;
+//         case 'Accepted':
+//             return TransactionStatus.Accepted;
+//         case 'Rejected':
+//             return TransactionStatus.Rejected;
+//         case 'InvalidTransaction':
+//             return TransactionStatus.InvalidTransaction;
+//         case 'OnlyFeeAccepted':
+//             return TransactionStatus.OnlyFeeAccepted;
+//         default:
+//             throw new Error(`Unknown status: ${status}`);
+//     }
+// }
