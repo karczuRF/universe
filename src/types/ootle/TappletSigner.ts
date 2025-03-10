@@ -9,6 +9,8 @@ import {
 import {
     Account,
     convertStringToTransactionStatus,
+    convertU256ToHexString,
+    createNftAddress,
     SubmitTransactionRequest,
     SubmitTransactionResponse,
     Substate,
@@ -22,18 +24,23 @@ import { IPCRpcTransport } from './ipc_transport';
 import { OotleAccount } from './account';
 import {
     AccountSetDefaultResponse,
+    BalanceEntry,
     ComponentAccessRules,
     Instruction,
     ListAccountNftRequest,
     ListAccountNftResponse,
+    NonFungibleId,
     NonFungibleToken,
     PublishTemplateRequest,
     PublishTemplateResponse,
+    ResourceAddress,
+    SubstatesGetResponse,
     SubstateType,
 } from '@tari-project/typescript-bindings';
 import { ListSubstatesResponse } from '../../../../tari.js/packages/tari_signer/dist';
 import { TappletPermissions } from '@tari-project/tari-permissions';
 import { TUWalletDaemonClient } from '@tari-project/tari-universe-signer';
+import { txCheck } from './transaction';
 
 export interface WindowSize {
     width: number;
@@ -150,21 +157,6 @@ export class TappletSigner implements TariSigner {
 
         console.info('🛜 [TU][signer] nfts_list response', res);
 
-        //TODO JUST TMP CHECKER
-        // try {
-        //     const resp = await this.client.get_nft({
-        //         nft_id: {
-        //             String: 'nft_8b9346033e3b8d283f1ff4a446873f529907c5baf18366ba816b589cb796621e_uuid_0816d48fb68796f1f91d85f47de6877880786c003f33b14f0ef99f05b9e82d77'.toString(),
-        //         },
-        //     });
-        //     console.info('🛜 [TU][signer] get_Nft response', resp);
-        // } catch (e) {
-        //     console.error('🛜 Failed to get nft with get_nft: ', e);
-        // }
-        // const nftid =
-        //     'nft_8b9346033e3b8d283f1ff4a446873f529907c5baf18366ba816b589cb796621e_uuid_0816d48fb68796f1f91d85f47de6877880786c003f33b14f0ef99f05b9e82d77';
-        // console.info('🛜🛜🛜🛜🛜 [TU][signer] typeof nftid', typeof nftid);
-
         const subst = 'vault_042d0b62dc93f2cdcbdec0103d9eb902a176e80c31f3a497c244a698ff48db53';
         try {
             const respGetSubR = await this.client.substatesGet({
@@ -175,23 +167,18 @@ export class TappletSigner implements TariSigner {
             console.error('🛜 Failed to get nft with get_substate resource : ', e);
         }
 
-        try {
-            const respGetSubNft = await this.client.nftsListWithData({
-                account: { ComponentAddress: substateIdToString(account.address) },
-                limit: 20,
-                offset: 0,
-            });
-            console.info('🛜 [TU][signer] nft_list_with_data response', respGetSubNft);
-        } catch (e) {
-            console.error('🛜 Failed to nft_list_with_data : ', e, subst);
-        }
-
         // TODO tip: if fails try `account: { ComponentAddress: account.address }`
         const { balances } = await this.client.accountsGetBalances({
             account: { ComponentAddress: substateIdToString(account.address) },
             refresh: false,
         });
         console.info('[TU]appletProvider] getAccount', account.name, balances);
+        try {
+            getNonFungibleEntries(balances, this.client);
+        } catch (e) {
+            console.error('🛜 Failed to nft_list_with_data : ', e, subst);
+        }
+
         return {
             account_id: account.key_index,
             address: substateIdToString(account.address),
@@ -232,7 +219,7 @@ export class TappletSigner implements TariSigner {
     }
 
     public async getSubstate(substate_id: string): Promise<Substate> {
-        const substateId = stringToSubstateId(substate_id);
+        // const substateId = stringToSubstateId(substate_id);
         const { value, record } = await this.client.substatesGet({ substate_id });
         return {
             value,
@@ -348,25 +335,63 @@ export class TappletSigner implements TariSigner {
         console.log('🛜 [TU][signer] get Nfts list response', res);
         return res;
     }
+
+    public async getNft(nft: NonFungibleToken): Promise<SubstatesGetResponse> {
+        return this.client.substatesGet({
+            substate_id: createNftAddress(nft),
+        });
+    }
 }
 
-// function convertStringToTransactionStatus(status: string): TransactionStatus {
-//     switch (status) {
-//         case 'New':
-//             return TransactionStatus.New;
-//         case 'DryRun':
-//             return TransactionStatus.DryRun;
-//         case 'Pending':
-//             return TransactionStatus.Pending;
-//         case 'Accepted':
-//             return TransactionStatus.Accepted;
-//         case 'Rejected':
-//             return TransactionStatus.Rejected;
-//         case 'InvalidTransaction':
-//             return TransactionStatus.InvalidTransaction;
-//         case 'OnlyFeeAccepted':
-//             return TransactionStatus.OnlyFeeAccepted;
-//         default:
-//             throw new Error(`Unknown status: ${status}`);
-//     }
-// }
+export function createNftAddressFromResource(address: ResourceAddress, tokenId: NonFungibleId): string {
+    let nftAddress = 'nft_';
+
+    const resourceAddress = address.replace(/^resource_/, '');
+    nftAddress += resourceAddress;
+
+    nftAddress += '_uuid_';
+
+    const nftIdHexString = convertU256ToHexString(tokenId);
+    nftAddress += nftIdHexString;
+
+    return nftAddress;
+}
+
+async function getNonFungibleEntries(balances: BalanceEntry[], client: TUWalletDaemonClient): Promise<any[]> {
+    const subnftDataArray: any[] = []; // Array to hold the subnftdata results
+
+    for (const balance of balances) {
+        if (balance.resource_type !== 'NonFungible') continue;
+
+        const subnft = await client.substatesGet({
+            substate_id: substateIdToString(balance.vault_address),
+        });
+        console.info('🛜🛜🛜 [TU][signer] nft geSubst', typeof subnft.value, subnft);
+
+        // Type guard to check if subnft.value is of type Vault
+        if ('Vault' in subnft.value) {
+            const vault = subnft.value.Vault;
+
+            // Check if resource_container is NonFungible
+            const resourceContainer = vault.resource_container;
+            if (resourceContainer && 'NonFungible' in resourceContainer) {
+                const nonFungibleContainer = resourceContainer.NonFungible;
+                const { address, token_ids } = nonFungibleContainer;
+
+                for (const tokenId of token_ids) {
+                    const nftDataId = createNftAddressFromResource(address, tokenId);
+                    console.info('🛜🛜🛜 [TU][signer] nft id', nftDataId);
+
+                    const subnftdata = await client.substatesGet({ substate_id: nftDataId });
+                    console.info('🛜🛜🛜 [TU][signer] getNft', subnftdata);
+
+                    subnftDataArray.push(subnftdata); // Collect the subnftdata
+                }
+            } else {
+                console.warn('🛜 [TU][signer] The resource_container is not of type NonFungible');
+            }
+        }
+    }
+
+    return subnftDataArray; // Return the collected subnftdata
+}
