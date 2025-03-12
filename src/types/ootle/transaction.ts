@@ -11,7 +11,7 @@ import {
     RejectReason,
 } from '@tari-project/typescript-bindings';
 import { TappletSigner } from './TappletSigner';
-import { FinalizeResult, SubmitTransactionRequest } from '@tari-project/tarijs';
+import { FinalizeResult, SubmitTransactionRequest, TransactionStatus } from '@tari-project/tarijs';
 import { TxSimulationResult } from './txSimulation';
 
 export interface TransactionEvent {
@@ -54,14 +54,14 @@ export const txCheck = {
     },
 };
 
-export type TappletTxStatus = 'dryRun' | 'pending' | 'success' | 'failure' | 'cancelled';
 export type TappletSignerMethod = Exclude<keyof TappletSigner, 'runOne'>;
 
-export interface TUTransaction {
+export interface TappletTransaction {
     id: number;
     methodName: TappletSignerMethod;
     args: SubmitTransactionRequest[];
-    status: TappletTxStatus;
+    status: TransactionStatus;
+    dryRun: TxSimulationResult;
     submit: () => Promise<FinalizeResult | null>;
     cancel: () => void;
     runSimulation: () => Promise<TxSimulationResult>;

@@ -25,18 +25,18 @@ const initialState: State = {
 export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
     ...initialState,
     createAccount: async (name: string) => {
-        const provider = useTappletSignerStore.getState().tappletSigner;
+        const signer = useTappletSignerStore.getState().tappletSigner;
         try {
-            if (!provider) {
+            if (!signer) {
                 return;
             }
 
-            const responseNewAcc = await provider.createFreeTestCoins(name);
+            const responseNewAcc = await signer.createFreeTestCoins(name);
 
             console.info('created acc: ', responseNewAcc);
             // this needs to be set manually
-            await provider.setDefaultAccount(name);
-            const account = await provider.getAccount();
+            await signer.setDefaultAccount(name);
+            const account = await signer.getAccount();
             set({
                 ootleAccount: account,
             });
@@ -45,15 +45,15 @@ export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
         }
     },
     setDefaultAccount: async (name: string) => {
-        const provider = useTappletSignerStore.getState().tappletSigner;
+        const signer = useTappletSignerStore.getState().tappletSigner;
         try {
-            if (!provider) {
+            if (!signer) {
                 return;
             }
-            await provider.setDefaultAccount(name);
-            // if tapplet uses TU Provider it gets default account
+            await signer.setDefaultAccount(name);
+            // if tapplet uses TU signer it gets default account
             // this is to make sure tapplet uses the account selected by the user
-            const account = await provider.getAccount();
+            const account = await signer.getAccount();
             set({
                 ootleAccount: account,
             });
@@ -62,14 +62,14 @@ export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
         }
     },
     getOotleAccountInfo: async () => {
-        const provider = useTappletSignerStore.getState().tappletSigner;
+        const signer = useTappletSignerStore.getState().tappletSigner;
         try {
-            if (!provider) {
+            if (!signer) {
                 return;
             }
-            // if tapplet uses TU Provider it gets default account
+            // if tapplet uses TU signer it gets default account
             // this is to make sure tapplet uses the account selected by the user
-            const account = await provider.getAccount();
+            const account = await signer.getAccount();
             set({
                 ootleAccount: account,
             });
@@ -78,12 +78,12 @@ export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
         }
     },
     getOotleAccountsList: async () => {
-        const provider = useTappletSignerStore.getState().tappletSigner;
+        const signer = useTappletSignerStore.getState().tappletSigner;
         try {
-            if (!provider) {
+            if (!signer) {
                 return;
             }
-            const list = await provider.getAccountsList();
+            const list = await signer.getAccountsList();
             set({
                 ootleAccountsList: list.accounts,
             });

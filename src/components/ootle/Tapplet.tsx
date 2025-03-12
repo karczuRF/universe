@@ -1,3 +1,4 @@
+import { useTappletTransactionsStore } from '@app/store/useTappletTransactionsStore';
 import { useTappletSignerStore } from '@app/store/useTappletSignerStore';
 import { useUIStore } from '@app/store/useUIStore';
 import { TappletSigner } from '@app/types/ootle/TappletSigner';
@@ -11,7 +12,7 @@ interface TappletProps {
 export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
     const tappletRef = useRef<HTMLIFrameElement | null>(null);
     const runTransaction = useTappletSignerStore((s) => s.runTransaction);
-    const addTransaction = useTappletSignerStore((s) => s.addTransaction);
+    const addTransaction = useTappletTransactionsStore((s) => s.addTransaction);
     const setDialogToShow = useUIStore((s) => s.setDialogToShow);
 
     function sendWindowSize() {
@@ -37,13 +38,13 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
             }
         } else if (event.data.type === 'signer-call') {
             console.info('🤝 [TU Tapplet][handle msg] event data:', event.data);
-            console.info('🤝 [TU Tapplet][handle msg] TX ADDED');
             if (event.data.methodName === 'submitTransaction') {
                 addTransaction(event);
+                console.info('🤝 [TU Tapplet][handle msg] TX ADDED');
                 setDialogToShow('txSimulation');
-                // runTappletTxSimulation(event);
                 return;
             }
+            console.info('🤝 [TU Tapplet][handle msg] RUN TX');
             runTappletTx(event);
         }
     }

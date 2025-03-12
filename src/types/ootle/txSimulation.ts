@@ -1,15 +1,5 @@
 import { TransactionStatus } from '@tari-project/tarijs';
 
-export type SimulationStatus = 'pending' | 'success' | 'failure';
-
-export interface Simulation {
-    transactionId: number;
-    status: SimulationStatus;
-    balanceUpdates: BalanceUpdate[];
-    errorMsg: string;
-    transaction: TxSimulation;
-}
-
 export interface BalanceUpdate {
     currentBalance: number;
     newBalance: number;
