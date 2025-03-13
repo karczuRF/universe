@@ -1,9 +1,11 @@
 import {
     substateIdToString,
+    stringToSubstateId,
     KeyBranch,
     AccountsGetBalancesResponse,
     TransactionSubmitRequest,
     AccountsListResponse,
+    WalletDaemonClient,
 } from '@tari-project/wallet_jrpc_client';
 import {
     Account,
@@ -36,7 +38,7 @@ import {
 } from '@tari-project/typescript-bindings';
 import { ListSubstatesResponse } from '../../../../tari.js/packages/tari_signer/dist';
 import { TappletPermissions } from '@tari-project/tari-permissions';
-import { ListAccountNftFromBalancesRequest, TUWalletDaemonClient } from '@tari-project/tari-universe-signer';
+import { ListAccountNftFromBalancesRequest } from '@tari-project/tari-universe-signer';
 
 export interface WindowSize {
     width: number;
@@ -56,12 +58,12 @@ export class TappletSigner implements TariSigner {
     public signerName = 'TappletSigner';
     id: string;
     params: TappletSignerParams;
-    client: TUWalletDaemonClient;
+    client: WalletDaemonClient;
     isProviderConnected: boolean;
 
     private constructor(
         params: TappletSignerParams,
-        connection: TUWalletDaemonClient,
+        connection: WalletDaemonClient,
         public width = 0,
         public height = 0
     ) {
@@ -72,7 +74,7 @@ export class TappletSigner implements TariSigner {
     }
 
     static build(params: TappletSignerParams): TappletSigner {
-        const client = TUWalletDaemonClient.new(new IPCRpcTransport());
+        const client = WalletDaemonClient.new(new IPCRpcTransport());
         return new TappletSigner(params, client);
     }
     public setWindowSize(width: number, height: number): void {
@@ -94,7 +96,7 @@ export class TappletSigner implements TariSigner {
         return this.isProviderConnected; //TODO tmp solution shoule be better one
     }
 
-    public async getClient(): Promise<TUWalletDaemonClient> {
+    public async getClient(): Promise<WalletDaemonClient> {
         return this.client;
     }
 
@@ -197,8 +199,9 @@ export class TappletSigner implements TariSigner {
     }
 
     public async getSubstate(substate_id: string): Promise<Substate> {
-        // const substateId = stringToSubstateId(substate_id);
-        const { value, record } = await this.client.substatesGet({ substate_id });
+        // TODO update param type if fix for `substate_id` is done in WalletDaemonClient
+        const substateId = stringToSubstateId(substate_id);
+        const { value, record } = await this.client.substatesGet({ substate_id: substateId });
         return {
             value,
             address: {
@@ -321,7 +324,7 @@ export class TappletSigner implements TariSigner {
             if (balance.resource_type !== 'NonFungible') continue;
 
             const substateNft = await this.client.substatesGet({
-                substate_id: substateIdToString(balance.vault_address),
+                substate_id: balance.vault_address,
             });
 
             if ('Vault' in substateNft.value) {
@@ -332,7 +335,9 @@ export class TappletSigner implements TariSigner {
 
                     for (const tokenId of token_ids) {
                         const nftId = createNftAddressFromResource(address, tokenId);
-                        const nftData = await this.client.substatesGet({ substate_id: nftId });
+                        // TODO tmp type convertion untill fix for `substateGet` is done
+                        const nftIdSubstate = stringToSubstateId(nftId);
+                        const nftData = await this.client.substatesGet({ substate_id: nftIdSubstate });
                         accountNfts.push(nftData);
                     }
                 }
