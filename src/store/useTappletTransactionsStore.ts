@@ -2,11 +2,12 @@ import { create } from './create.ts';
 import { useAppStateStore } from './appStateStore.ts';
 import { TappletSigner } from '@app/types/ootle/TappletSigner.ts';
 import { TransactionEvent, TappletTransaction, txCheck } from '@app/types/ootle/transaction.ts';
-import { FinalizeResult, SubmitTransactionRequest, TransactionStatus, UpSubstates } from '@tari-project/tarijs';
 import { useOotleWalletStore } from './useOotleWalletStore.ts';
 import { BalanceUpdate, TxSimulationResult } from '@app/types/ootle/txSimulation.ts';
 import { AccountsGetBalancesResponse } from '@tari-project/typescript-bindings';
 import { useTappletSignerStore } from './useTappletSignerStore.ts';
+import { FinalizeResult, TransactionStatus, UpSubstates } from '@tari-project/tarijs-types';
+import { SubmitTransactionRequest } from '@tari-project/tari-signer';
 
 interface State {
     pendingTxId?: number;

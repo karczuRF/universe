@@ -3,9 +3,8 @@ import { ActiveTapplet } from '@app/types/ootle/tapplet.ts';
 import { useAppStateStore } from './appStateStore.ts';
 import { TappletSigner, TappletSignerParams } from '@app/types/ootle/TappletSigner.ts';
 import { TransactionEvent } from '@app/types/ootle/transaction.ts';
-import { IndexerProvider, IndexerProviderParameters, TariPermissions } from '@tari-project/tarijs';
 
-import { createPermissionFromType } from '@tari-project/tari-permissions';
+import { createPermissionFromType, TariPermissions } from '@tari-project/tari-permissions';
 
 interface State {
     isInitialized: boolean;

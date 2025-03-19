@@ -1,6 +1,7 @@
 import { create } from './create.ts';
 import { useAppStateStore } from './appStateStore.ts';
-import { IndexerProvider, IndexerProviderParameters, TariPermissions } from '@tari-project/tarijs';
+import { IndexerProvider, IndexerProviderParameters } from '@tari-project/indexer-provider';
+import { TariPermissions } from '@tari-project/tari-permissions';
 
 interface State {
     isInitialized: boolean;

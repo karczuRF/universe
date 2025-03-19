@@ -7,9 +7,9 @@ import { SquaredButton } from '@app/components/elements/buttons/SquaredButton';
 import { Typography } from '@app/components/elements/Typography';
 import { memo, useCallback, useState } from 'react';
 import { ButtonsWrapper } from './TappletTransactionDialog.styles';
-import { TransactionStatus } from '@tari-project/tarijs';
 import { useTappletTransactionsStore } from '@app/store/useTappletTransactionsStore';
 import { BalanceUpdate } from '@app/types/ootle/txSimulation';
+import { TransactionStatus } from '@tari-project/tarijs-types';
 
 const TappletTransactionDialog = memo(function AutoUpdateDialog() {
     const { t } = useTranslation('setup-view', { useSuspense: false }); //TODO add transaltion

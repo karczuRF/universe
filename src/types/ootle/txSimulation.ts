@@ -1,4 +1,4 @@
-import { TransactionStatus } from '@tari-project/tarijs';
+import { TransactionStatus } from '@tari-project/tarijs-types';
 
 export interface BalanceUpdate {
     currentBalance: number;

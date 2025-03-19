@@ -6,12 +6,15 @@ import {
     TransactionSubmitRequest,
     AccountsListResponse,
     WalletDaemonClient,
+    SubstateType,
+    AccountSetDefaultResponse,
 } from '@tari-project/wallet_jrpc_client';
+import { IPCRpcTransport } from './ipc_transport';
+import { OotleAccount } from './account';
+import { TappletPermissions } from '@tari-project/tari-permissions';
 import {
     Account,
-    convertStringToTransactionStatus,
-    convertU256ToHexString,
-    createNftAddressFromToken,
+    ListSubstatesResponse,
     SubmitTransactionRequest,
     SubmitTransactionResponse,
     Substate,
@@ -19,26 +22,19 @@ import {
     TemplateDefinition,
     TransactionResult,
     VaultBalances,
-} from '@tari-project/tarijs';
-import { IPCRpcTransport } from './ipc_transport';
-import { OotleAccount } from './account';
+} from '@tari-project/tari-signer';
 import {
-    AccountSetDefaultResponse,
+    BalanceEntry,
     ComponentAccessRules,
     Instruction,
     ListAccountNftRequest,
     ListAccountNftResponse,
-    NonFungibleId,
-    NonFungibleToken,
     PublishTemplateRequest,
     PublishTemplateResponse,
-    ResourceAddress,
     SubstatesGetResponse,
-    SubstateType,
 } from '@tari-project/typescript-bindings';
-import { ListSubstatesResponse } from '../../../../tari.js/packages/tari_signer/dist';
-import { TappletPermissions } from '@tari-project/tari-permissions';
-import { ListAccountNftFromBalancesRequest } from '@tari-project/tari-universe-signer';
+import '@tari-project/tarijs-types';
+import { convertStringToTransactionStatus, createNftAddressFromResource } from '@tari-project/tarijs-types';
 
 export interface WindowSize {
     width: number;
@@ -53,6 +49,10 @@ export interface TappletSignerParams {
 }
 
 export type TappletSignerMethod = Exclude<keyof TappletSigner, 'runOne'>;
+
+export interface ListAccountNftFromBalancesRequest {
+    balances: BalanceEntry[];
+}
 
 export class TappletSigner implements TariSigner {
     public signerName = 'TappletSigner';
@@ -348,16 +348,16 @@ export class TappletSigner implements TariSigner {
     }
 }
 
-export function createNftAddressFromResource(address: ResourceAddress, tokenId: NonFungibleId): string {
-    let nftAddress = 'nft_';
+// export function createNftAddressFromResource(address: ResourceAddress, tokenId: NonFungibleId): string {
+//     let nftAddress = 'nft_';
 
-    const resourceAddress = address.replace(/^resource_/, '');
-    nftAddress += resourceAddress;
+//     const resourceAddress = address.replace(/^resource_/, '');
+//     nftAddress += resourceAddress;
 
-    nftAddress += '_uuid_';
+//     nftAddress += '_uuid_';
 
-    const nftIdHexString = convertU256ToHexString(tokenId);
-    nftAddress += nftIdHexString;
+//     const nftIdHexString = convertU256ToHexString(tokenId);
+//     nftAddress += nftIdHexString;
 
-    return nftAddress;
-}
+//     return nftAddress;
+// }

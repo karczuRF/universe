@@ -11,8 +11,9 @@ import {
     RejectReason,
 } from '@tari-project/typescript-bindings';
 import { TappletSigner } from './TappletSigner';
-import { FinalizeResult, SubmitTransactionRequest, TransactionStatus } from '@tari-project/tarijs';
+import { SubmitTransactionRequest, TransactionStatus } from '@tari-project/tari-signer';
 import { TxSimulationResult } from './txSimulation';
+import { FinalizeResult } from '@tari-project/tarijs-types';
 
 export interface TransactionEvent {
     methodName: Exclude<keyof TappletSigner, 'runOne'>;
