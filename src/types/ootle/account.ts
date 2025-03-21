@@ -1,9 +1,4 @@
-import { VaultData } from '@tari-project/tarijs';
-
-export interface OotleAccount {
-    account_id: number;
-    address: string;
-    public_key: string;
-    resources: VaultData[];
+import { AccountData } from '@tari-project/tarijs-types';
+export interface OotleAccount extends AccountData {
     account_name: string;
 }

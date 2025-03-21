@@ -1,4 +1,4 @@
-import { TariPermission } from '@tari-project/tari-permissions';
+import { TappletPermissions } from '@tari-project/tari-permissions';
 
 export interface RegisteredTapplet {
     id: string;
@@ -85,8 +85,8 @@ export interface TappletConfig {
     supportedChain: SupportedChain[];
 }
 
-// TODO impor it from tari.js when is possible
-export interface TappletPermissions {
-    requiredPermissions: TariPermission[];
-    optionalPermissions: TariPermission[];
-}
+// // TODO impor it from tari.js when is possible
+// export interface TappletPermissions {
+//     requiredPermissions: TariPermission[];
+//     optionalPermissions: TariPermission[];
+// }

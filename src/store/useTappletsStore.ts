@@ -9,7 +9,7 @@ import {
     TappletConfig,
 } from '@app/types/ootle/tapplet.ts';
 import { useAppStateStore } from './appStateStore.ts';
-import { useTappletProviderStore } from './useTappletProviderStore.ts';
+import { useTappletSignerStore } from './useTappletSignerStore.ts';
 
 export const TAPPLET_CONFIG_FILE = 'tapplet.config.json'; //TODO
 
@@ -121,7 +121,7 @@ export const useTappletsStore = create<TappletsStoreState>()((set, get) => ({
     setActiveTappById: async (tappletId, isDev) => {
         console.info('SET ACTIVE TAP', tappletId, get().activeTapplet?.tapplet_id);
         if (tappletId == get().activeTapplet?.tapplet_id) return;
-        const tappProviderState = useTappletProviderStore.getState();
+        const tappProviderState = useTappletSignerStore.getState();
         // dev tapplet
         if (isDev) {
             const tapplet = get().devTapplets.find((tapp) => tapp.id === tappletId);
@@ -140,13 +140,13 @@ export const useTappletsStore = create<TappletsStoreState>()((set, get) => ({
                 supportedChain: config.supportedChain,
             };
             set({ activeTapplet });
-            tappProviderState.setTappletProvider(config.packageName, activeTapplet);
+            tappProviderState.setTappletSigner(config.packageName, activeTapplet);
             return;
         }
 
         const activeTapplet = await invoke('launch_tapplet', { installedTappletId: tappletId });
         set({ activeTapplet });
-        tappProviderState.setTappletProvider(tappletId.toString(), activeTapplet);
+        tappProviderState.setTappletSigner(tappletId.toString(), activeTapplet);
         return;
     },
     addDevTapp: async (endpoint) => {

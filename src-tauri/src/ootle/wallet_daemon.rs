@@ -49,7 +49,6 @@ pub async fn spawn_wallet_daemon(
 
     let mut cli = Cli::init();
     let network = Network::get_current_or_user_setting_or_default();
-    info!(target: LOG_TARGET, "🌟 WALLET DAEMON NETWORK {:?}", &network);
     cli.common.network = Some(network);
     cli.common.base_path = data_dir.to_str().unwrap().to_owned();
     cli.common.config = wallet_daemon_config_file.clone();
@@ -58,6 +57,7 @@ pub async fn spawn_wallet_daemon(
     let cfg = load_configuration(wallet_daemon_config_file, true, &cli, None).unwrap();
 
     let mut config = ApplicationConfig::load_from(&cfg).unwrap();
+    info!(target: LOG_TARGET, "🌟 WALLET DAEMON NETWORK {:?} LOADED CONFIG {:?}", &network, &config);
     config.dan_wallet_daemon = WalletDaemonConfig::default();
     let listening_json_rpc_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port);
 
@@ -80,6 +80,12 @@ pub async fn spawn_wallet_daemon(
 
     let shutdown = Shutdown::new();
     let shutdown_signal = shutdown.to_signal();
+    info!(
+        target: LOG_TARGET,
+        "🟢 Starting wallet on {} connected to indexer {}",
+        config.dan_wallet_daemon.network,
+        config.dan_wallet_daemon.indexer_json_rpc_url
+    );
 
     match run_tari_dan_wallet_daemon(config, shutdown_signal).await {
         Ok(_) => {

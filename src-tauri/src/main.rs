@@ -906,7 +906,8 @@ async fn setup_inner(
             permission: std::sync::Mutex::new("".to_string()),
         });
         app.manage(ShutdownTokens::default());
-        let jrpc_port = PortAllocator::new().assign_port_with_fallback();
+        // let jrpc_port = PortAllocator::new().assign_port_with_fallback();
+        let jrpc_port = 9000;
         app.manage(OotleWallet { jrpc_port });
 
         info!(target: LOG_TARGET, "🚀🚀🚀 RUN OOTLE THREAD {:?}", jrpc_port);

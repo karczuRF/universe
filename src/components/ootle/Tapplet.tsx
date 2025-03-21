@@ -1,17 +1,18 @@
-import { useTappletProviderStore } from '@app/store/useTappletProviderStore';
+import { useTappletTransactionsStore } from '@app/store/useTappletTransactionsStore';
+import { useTappletSignerStore } from '@app/store/useTappletSignerStore';
 import { useUIStore } from '@app/store/useUIStore';
-import { TappletProvider } from '@app/types/ootle/TappletProvider';
+import { TappletSigner } from '@app/types/ootle/TappletSigner';
 import { useCallback, useEffect, useRef } from 'react';
 
 interface TappletProps {
     source: string;
-    provider?: TappletProvider;
+    provider?: TappletSigner;
 }
 
 export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
     const tappletRef = useRef<HTMLIFrameElement | null>(null);
-    const runTransaction = useTappletProviderStore((s) => s.runTransaction);
-    const addTransaction = useTappletProviderStore((s) => s.addTransaction);
+    const runTransaction = useTappletSignerStore((s) => s.runTransaction);
+    const addTransaction = useTappletTransactionsStore((s) => s.addTransaction);
     const setDialogToShow = useUIStore((s) => s.setDialogToShow);
 
     function sendWindowSize() {
@@ -35,15 +36,15 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
                 provider?.setWindowSize(width, height);
                 provider?.sendWindowSizeMessage(tappletWindow, source);
             }
-        } else if (event.data.type === 'provider-call') {
+        } else if (event.data.type === 'signer-call') {
             console.info('🤝 [TU Tapplet][handle msg] event data:', event.data);
-            console.info('🤝 [TU Tapplet][handle msg] TX ADDED');
             if (event.data.methodName === 'submitTransaction') {
                 addTransaction(event);
+                console.info('🤝 [TU Tapplet][handle msg] TX ADDED');
                 setDialogToShow('txSimulation');
-                // runTappletTxSimulation(event);
                 return;
             }
+            console.info('🤝 [TU Tapplet][handle msg] RUN TX');
             runTappletTx(event);
         }
     }

@@ -1,6 +1,5 @@
 import {
     SubstateDiff,
-    TransactionResult,
     VaultId,
     Vault,
     SubstateId,
@@ -10,12 +9,17 @@ import {
     Amount,
     RejectReason,
 } from '@tari-project/typescript-bindings';
-import { TappletProvider } from './TappletProvider';
-import { FinalizeResult, SubmitTransactionRequest } from '@tari-project/tarijs';
+import { TappletSigner } from './TappletSigner';
 import { TxSimulationResult } from './txSimulation';
+import {
+    FinalizeResult,
+    FinalizeResultStatus,
+    SubmitTransactionRequest,
+    TransactionStatus,
+} from '@tari-project/tarijs-types';
 
 export interface TransactionEvent {
-    methodName: Exclude<keyof TappletProvider, 'runOne'>;
+    methodName: Exclude<keyof TappletSigner, 'runOne'>;
     /* eslint-disable @typescript-eslint/no-explicit-any */
     args: any[];
     id: number;
@@ -26,7 +30,7 @@ function isOfType<T extends object>(obj: T, key: keyof T): boolean {
 }
 
 export const txCheck = {
-    isAccept: (result: TransactionResult): result is { Accept: SubstateDiff } => {
+    isAccept: (result: FinalizeResultStatus): result is { Accept: SubstateDiff } => {
         return 'Accept' in result;
     },
 
@@ -44,24 +48,24 @@ export const txCheck = {
         return 'Fungible' in resourceContainer;
     },
 
-    isReject: (result: TransactionResult): result is { Reject: RejectReason } => {
+    isReject: (result: FinalizeResultStatus): result is { Reject: RejectReason } => {
         return 'Reject' in result;
     },
     isAcceptFeeRejectRest: (
-        result: TransactionResult
+        result: FinalizeResultStatus
     ): result is { AcceptFeeRejectRest: [SubstateDiff, RejectReason] } => {
         return 'AcceptFeeRejectRest' in result;
     },
 };
 
-export type TappletTxStatus = 'dryRun' | 'pending' | 'success' | 'failure' | 'cancelled';
-export type TappletProviderMethod = Exclude<keyof TappletProvider, 'runOne'>;
+export type TappletSignerMethod = Exclude<keyof TappletSigner, 'runOne'>;
 
-export interface TUTransaction {
+export interface TappletTransaction {
     id: number;
-    methodName: TappletProviderMethod;
+    methodName: TappletSignerMethod;
     args: SubmitTransactionRequest[];
-    status: TappletTxStatus;
+    status: TransactionStatus;
+    dryRun: TxSimulationResult;
     submit: () => Promise<FinalizeResult | null>;
     cancel: () => void;
     runSimulation: () => Promise<TxSimulationResult>;

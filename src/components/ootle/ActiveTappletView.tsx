@@ -1,4 +1,4 @@
-import { useTappletProviderStore } from '@app/store/useTappletProviderStore';
+import { useTappletSignerStore } from '@app/store/useTappletSignerStore';
 import { Box, IconButton, Typography } from '@mui/material';
 import { Tapplet } from './Tapplet';
 import { MdClose } from 'react-icons/md';
@@ -6,7 +6,7 @@ import { useTappletsStore } from '@app/store/useTappletsStore';
 import { HeaderContainer } from './styles';
 
 export default function ActiveTappletView() {
-    const tappProvider = useTappletProviderStore((s) => s.tappletProvider);
+    const tappProvider = useTappletSignerStore((s) => s.tappletSigner);
     const tapplet = useTappletsStore((s) => s.activeTapplet);
     const deactivateTapplet = useTappletsStore((s) => s.deactivateTapplet);
 

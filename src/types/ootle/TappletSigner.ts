@@ -1,59 +1,75 @@
 import {
-    WalletDaemonClient,
     stringToSubstateId,
-    substateIdToString,
     KeyBranch,
     AccountsGetBalancesResponse,
     TransactionSubmitRequest,
     AccountsListResponse,
+    WalletDaemonClient,
+    SubstateType,
+    AccountSetDefaultResponse,
 } from '@tari-project/wallet_jrpc_client';
+import { IPCRpcTransport } from './ipc_transport';
+import { OotleAccount } from './account';
+import { TappletPermissions } from '@tari-project/tari-permissions';
 import {
-    Account,
+    AccountData,
+    GetTransactionResultResponse,
+    ListSubstatesResponse,
     SubmitTransactionRequest,
     SubmitTransactionResponse,
     Substate,
-    TariProvider,
     TemplateDefinition,
     TransactionResult,
-    TransactionStatus,
     VaultBalances,
-} from '@tari-project/tarijs';
-import type { ListSubstatesResponse } from '@tari-project/tari-provider';
+} from '@tari-project/tarijs-types';
 import {
-    AccountSetDefaultResponse,
+    BalanceEntry,
     ComponentAccessRules,
+    ConfidentialViewVaultBalanceRequest,
     Instruction,
+    ListAccountNftRequest,
+    ListAccountNftResponse,
     PublishTemplateRequest,
     PublishTemplateResponse,
-    SubstateType,
+    SubstatesGetResponse,
+    SubstatesListRequest,
 } from '@tari-project/typescript-bindings';
-import { TappletPermissions } from './tapplet';
-import { IPCRpcTransport } from './ipc_transport';
-import { OotleAccount } from './account';
+import '@tari-project/tarijs-types';
+import {
+    convertStringToTransactionStatus,
+    createNftAddressFromResource,
+    ListSubstatesRequest,
+    substateIdToString,
+} from '@tari-project/tarijs-types';
+import { TariSigner } from '@tari-project/tari-signer';
 
 export interface WindowSize {
     width: number;
     height: number;
 }
 
-export interface TappletProviderParams {
+export interface TappletSignerParams {
     id: string;
     permissions: TappletPermissions;
     name?: string;
     onConnection?: () => void;
 }
 
-export type TappletProviderMethod = Exclude<keyof TappletProvider, 'runOne'>;
+export type TappletSignerMethod = Exclude<keyof TappletSigner, 'runOne'>;
 
-export class TappletProvider implements TariProvider {
-    public providerName = 'TappletProvider';
+export interface ListAccountNftFromBalancesRequest {
+    balances: BalanceEntry[];
+}
+
+export class TappletSigner implements TariSigner {
+    public signerName = 'TappletSigner';
     id: string;
-    params: TappletProviderParams;
+    params: TappletSignerParams;
     client: WalletDaemonClient;
     isProviderConnected: boolean;
 
     private constructor(
-        params: TappletProviderParams,
+        params: TappletSignerParams,
         connection: WalletDaemonClient,
         public width = 0,
         public height = 0
@@ -64,9 +80,9 @@ export class TappletProvider implements TariProvider {
         this.id = params.id;
     }
 
-    static build(params: TappletProviderParams): TappletProvider {
+    static build(params: TappletSignerParams): TappletSigner {
         const client = WalletDaemonClient.new(new IPCRpcTransport());
-        return new TappletProvider(params, client);
+        return new TappletSigner(params, client);
     }
     public setWindowSize(width: number, height: number): void {
         this.width = width;
@@ -77,8 +93,8 @@ export class TappletProvider implements TariProvider {
         tappletWindow?.postMessage({ height: this.height, width: this.width, type: 'resize' }, targetOrigin);
     }
     /* eslint-disable @typescript-eslint/no-explicit-any */
-    async runOne(method: TappletProviderMethod, args: any[]): Promise<any> {
-        console.info('[TU][TappletProvider] runOne', method);
+    async runOne(method: any, args: any[]): Promise<any> {
+        console.info('[TU][TappletSigner] runOne', method);
         const res = (this[method] as (...args: any) => Promise<any>)(...args);
         return res;
     }
@@ -92,7 +108,7 @@ export class TappletProvider implements TariProvider {
     }
 
     // TODO account name should be included in TU Provider method definition to pass the arg
-    public async createFreeTestCoins(accountName = 'test', amount = 1_000_000, fee?: number): Promise<Account> {
+    public async createFreeTestCoins(accountName = 'test', amount = 1_000_000, fee?: number): Promise<AccountData> {
         const res = await this.client.createFreeTestCoins({
             account: (accountName && { Name: accountName }) || null,
             amount,
@@ -112,7 +128,7 @@ export class TappletProvider implements TariProvider {
         fee?: number,
         customAccessRules?: ComponentAccessRules,
         isDefault = true
-    ): Promise<Account> {
+    ): Promise<AccountData> {
         const res = await this.client.accountsCreate({
             account_name: accountName ?? null,
             custom_access_rules: customAccessRules ?? null,
@@ -136,12 +152,20 @@ export class TappletProvider implements TariProvider {
         const { account, public_key } = await this.client.accountsGetDefault({});
         console.info('🔌 [TU][Provider] getAccount with accountsGetDefault', account, public_key);
 
+        //TODO JUST TMP CHECKER
+        const nftList = await this.client.nftsList({
+            account: { ComponentAddress: substateIdToString(account.address) },
+            limit: 20,
+            offset: 0,
+        });
+        console.info('🛜 [TU][signer] nfts_list acc', nftList);
+
         // TODO tip: if fails try `account: { ComponentAddress: account.address }`
         const { balances } = await this.client.accountsGetBalances({
             account: { ComponentAddress: substateIdToString(account.address) },
             refresh: false,
         });
-        console.info('[TU]appletProvider] getAccount', account.name, balances);
+
         return {
             account_id: account.key_index,
             address: substateIdToString(account.address),
@@ -182,6 +206,7 @@ export class TappletProvider implements TariProvider {
     }
 
     public async getSubstate(substate_id: string): Promise<Substate> {
+        // TODO update param type if fix for `substate_id` is done in WalletDaemonClient
         const substateId = stringToSubstateId(substate_id);
         const { value, record } = await this.client.substatesGet({ substate_id: substateId });
         return {
@@ -221,7 +246,7 @@ export class TappletProvider implements TariProvider {
         return { transaction_id: res.transaction_id };
     }
 
-    public async getTransactionResult(transactionId: string): Promise<TransactionResult> {
+    public async getTransactionResult(transactionId: string): Promise<GetTransactionResultResponse> {
         const res = await this.client.getTransactionResult({
             transaction_id: transactionId,
         });
@@ -239,36 +264,37 @@ export class TappletProvider implements TariProvider {
     }
 
     public async getTemplateDefinition(template_address: string): Promise<TemplateDefinition> {
-        return await this.client.templatesGet({ template_address });
+        const res = await this.client.templatesGet({ template_address });
+        return res.template_definition;
     }
 
-    public async getConfidentialVaultBalances(
-        viewKeyId: number,
-        vaultId: string,
-        min: number | null = null,
-        max: number | null = null
-    ): Promise<VaultBalances> {
+    public async getConfidentialVaultBalances({
+        vault_id,
+        maximum_expected_value,
+        minimum_expected_value,
+        view_key_id,
+    }: ConfidentialViewVaultBalanceRequest): Promise<VaultBalances> {
         const res = await this.client.viewVaultBalance({
-            view_key_id: viewKeyId,
-            vault_id: vaultId,
-            minimum_expected_value: min,
-            maximum_expected_value: max,
+            view_key_id,
+            vault_id,
+            minimum_expected_value,
+            maximum_expected_value,
         });
         return { balances: res.balances as unknown as Map<string, number | null> };
     }
 
-    public async listSubstates(
-        filter_by_template: string | null,
-        filter_by_type: SubstateType | null,
-        limit: number | null,
-        offset: number | null
-    ): Promise<ListSubstatesResponse> {
+    public async listSubstates({
+        filter_by_template,
+        filter_by_type,
+        limit,
+        offset,
+    }: ListSubstatesRequest): Promise<ListSubstatesResponse> {
         const res = await this.client.substatesList({
             filter_by_template,
             filter_by_type,
-            limit: limit ? BigInt(limit) : null,
-            offset: offset ? BigInt(offset) : null,
-        });
+            limit,
+            offset,
+        } as SubstatesListRequest);
         const substates = res.substates.map((s) => ({
             substate_id: substateIdToString(s.substate_id),
             module_name: s.module_name,
@@ -286,25 +312,60 @@ export class TappletProvider implements TariProvider {
     public async transactionsPublishTemplate(request: PublishTemplateRequest): Promise<PublishTemplateResponse> {
         return await this.client.publishTemplate(request);
     }
-}
 
-function convertStringToTransactionStatus(status: string): TransactionStatus {
-    switch (status) {
-        case 'New':
-            return TransactionStatus.New;
-        case 'DryRun':
-            return TransactionStatus.DryRun;
-        case 'Pending':
-            return TransactionStatus.Pending;
-        case 'Accepted':
-            return TransactionStatus.Accepted;
-        case 'Rejected':
-            return TransactionStatus.Rejected;
-        case 'InvalidTransaction':
-            return TransactionStatus.InvalidTransaction;
-        case 'OnlyFeeAccepted':
-            return TransactionStatus.OnlyFeeAccepted;
-        default:
-            throw new Error(`Unknown status: ${status}`);
+    public async getNftsList({ account, limit, offset }: ListAccountNftRequest): Promise<ListAccountNftResponse> {
+        const res = await this.client.nftsList({
+            account,
+            limit,
+            offset,
+        });
+
+        return res;
+    }
+
+    public async getNftsFromAccountBalances(req: ListAccountNftFromBalancesRequest): Promise<SubstatesGetResponse[]> {
+        const accountNfts: SubstatesGetResponse[] = [];
+        const balances = req.balances;
+        if (balances.length === 0) return accountNfts;
+
+        for (const balance of balances) {
+            if (balance.resource_type !== 'NonFungible') continue;
+
+            const substateNft = await this.client.substatesGet({
+                substate_id: balance.vault_address,
+            });
+
+            if ('Vault' in substateNft.value) {
+                const resourceContainer = substateNft.value.Vault.resource_container;
+                if (resourceContainer && 'NonFungible' in resourceContainer) {
+                    const nonFungibleContainer = resourceContainer.NonFungible;
+                    const { address, token_ids } = nonFungibleContainer;
+
+                    for (const tokenId of token_ids) {
+                        const nftId = createNftAddressFromResource(address, tokenId);
+                        // TODO tmp type convertion untill fix for `substateGet` is done
+                        const nftIdSubstate = stringToSubstateId(nftId);
+                        const nftData = await this.client.substatesGet({ substate_id: nftIdSubstate });
+                        accountNfts.push(nftData);
+                    }
+                }
+            }
+        }
+        console.info('🛜🛜🛜 [TU][signer][getNftsFromAccountBalances]', accountNfts);
+        return accountNfts;
     }
 }
+
+// export function createNftAddressFromResource(address: ResourceAddress, tokenId: NonFungibleId): string {
+//     let nftAddress = 'nft_';
+
+//     const resourceAddress = address.replace(/^resource_/, '');
+//     nftAddress += resourceAddress;
+
+//     nftAddress += '_uuid_';
+
+//     const nftIdHexString = convertU256ToHexString(tokenId);
+//     nftAddress += nftIdHexString;
+
+//     return nftAddress;
+// }

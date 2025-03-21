@@ -4,7 +4,7 @@ import { Typography } from '@app/components/elements/Typography';
 
 import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect } from 'react';
-import { useTappletProviderStore } from '@app/store/useTappletProviderStore';
+import { useTappletSignerStore } from '@app/store/useTappletSignerStore';
 
 import { Stack } from '@app/components/elements/Stack';
 import { CardContainer, ConnectionIcon } from '../../components/Settings.styles';
@@ -12,12 +12,16 @@ import { CardComponent } from '../../components/Card.component';
 import SelectAccount from './SelectOotleAccount';
 import { useOotleWalletStore } from '@app/store/useOotleWalletStore';
 import { shortenSubstateAddress } from '@app/utils';
+import { Button } from '@app/components/elements/buttons/Button';
+import { useTappletProviderStore } from '@app/store/useTappletProviderStore';
 
 const OotleWalletBalance = () => {
     const { t } = useTranslation(['settings', 'ootle'], { useSuspense: false });
 
-    const tappProvider = useTappletProviderStore((s) => s.tappletProvider);
-    const isTappProviderInitialized = useTappletProviderStore((s) => s.isInitialized);
+    const tappSigner = useTappletSignerStore((s) => s.tappletSigner);
+    const provider = useTappletProviderStore((s) => s.provider);
+    const isTappProviderInitialized = useTappletSignerStore((s) => s.isInitialized);
+    const initTappletSigner = useTappletSignerStore((s) => s.initTappletSigner);
     const initTappletProvider = useTappletProviderStore((s) => s.initTappletProvider);
     const ootleAccount = useOotleWalletStore((s) => s.ootleAccount);
     const ootleAccountsList = useOotleWalletStore((s) => s.ootleAccountsList);
@@ -27,14 +31,15 @@ const OotleWalletBalance = () => {
     // TODO fetch all data from backend
     const refreshProvider = useCallback(async () => {
         try {
-            if (!tappProvider) {
+            if (!tappSigner) {
+                await initTappletSigner();
                 await initTappletProvider();
                 return;
             }
         } catch (error) {
             console.error(error);
         }
-    }, [tappProvider, initTappletProvider]);
+    }, [tappSigner, initTappletSigner, initTappletProvider]);
 
     const refreshAccount = useCallback(async () => {
         try {
@@ -51,6 +56,36 @@ const OotleWalletBalance = () => {
             console.error(error);
         }
     }, [getOotleAccountsList]);
+
+    const onClick = useCallback(async () => {
+        try {
+            const ls = await provider?.listSubstates({
+                filter_by_template: null,
+                filter_by_type: null,
+                offset: null,
+                limit: 10,
+            });
+            console.log('PROVIDER LIST SUBSTATE', ls);
+            const ls1 = await tappSigner?.listSubstates({
+                filter_by_template: null,
+                filter_by_type: null,
+                offset: null,
+                limit: 10,
+            });
+            console.log('signer LIST SUBSTATE', ls1);
+        } catch (error) {
+            console.error(error);
+        }
+    }, [provider]);
+
+    const onClickTemplates = useCallback(async () => {
+        try {
+            const t = await provider?.listTemplates();
+            console.log('PROVIDER LIST TEMPLATES', t);
+        } catch (error) {
+            console.error(error);
+        }
+    }, [provider]);
 
     useEffect(() => {
         refreshProvider();
@@ -99,6 +134,8 @@ const OotleWalletBalance = () => {
                         </Stack>
                     </SettingsGroupContent>
                 </SettingsGroup>
+                <Button onClick={onClick}>{'PROVIDER LIST SUBSTATE'}</Button>
+                <Button onClick={onClickTemplates}>{'PROVIDER LIST TEMPLATES'}</Button>
                 <SettingsGroup>
                     <SelectAccount accountsList={ootleAccountsList} currentAccount={ootleAccount} />
                 </SettingsGroup>
