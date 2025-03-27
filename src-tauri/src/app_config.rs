@@ -21,6 +21,7 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::credential_manager::{Credential, KEYRING_ACCESSED};
+use crate::gpu_miner::EngineType;
 use semver::Version;
 use std::{path::PathBuf, time::SystemTime};
 use sys_locale::get_locale;
@@ -33,7 +34,6 @@ use log::{debug, info, warn};
 use monero_address_creator::network::Mainnet;
 use monero_address_creator::Seed as MoneroSeed;
 use serde::{Deserialize, Serialize};
-use tari_common::configuration::Network;
 use tokio::fs;
 
 const LOG_TARGET: &str = "tari::universe::app_config";
@@ -77,8 +77,6 @@ pub struct AppConfigFromFile {
     use_tor: bool,
     #[serde(default = "default_true")]
     paper_wallet_enabled: bool,
-    #[serde(default = "default_false")]
-    reset_earnings: bool,
     eco_mode_cpu_threads: Option<u32>,
     ludicrous_mode_cpu_threads: Option<u32>,
     #[serde(default = "default_vec_string")]
@@ -122,6 +120,8 @@ pub struct AppConfigFromFile {
     // enable local node & Indexer: check binaries and run base node
     #[serde(default = "default_false")]
     ootle_node_enabled: bool,
+    #[serde(default = "default_gpu_engine")]
+    gpu_engine: String,
 }
 
 impl Default for AppConfigFromFile {
@@ -156,7 +156,6 @@ impl Default for AppConfigFromFile {
             mmproxy_use_monero_fail: false,
             keyring_accessed: false,
             auto_update: true,
-            reset_earnings: false,
             custom_power_levels_enabled: true,
             sharing_enabled: true,
             visual_mode: true,
@@ -168,9 +167,8 @@ impl Default for AppConfigFromFile {
             airdrop_tokens: None,
             ootle_enabled: true,
             ootle_node_enabled: false,
-        }
+            gpu_engine: default_gpu_engine(),
     }
-}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum DisplayMode {
@@ -267,7 +265,6 @@ pub(crate) struct AppConfig {
     application_language: String,
     paper_wallet_enabled: bool,
     use_tor: bool,
-    reset_earnings: bool,
     eco_mode_cpu_threads: Option<u32>,
     ludicrous_mode_cpu_threads: Option<u32>,
     eco_mode_cpu_options: Vec<String>,
@@ -290,6 +287,7 @@ pub(crate) struct AppConfig {
     airdrop_tokens: Option<AirdropTokens>,
     ootle_enabled: bool,
     ootle_node_enabled: bool,
+    gpu_engine: String,
 }
 
 impl AppConfig {
@@ -299,7 +297,7 @@ impl AppConfig {
             config_file: None,
             created_at: None,
             mode: MiningMode::Eco,
-            display_mode: DisplayMode::Light,
+            display_mode: DisplayMode::System,
             mine_on_app_start: true,
             p2pool_enabled: true,
             last_binaries_update_timestamp: default_system_time(),
@@ -317,7 +315,6 @@ impl AppConfig {
             custom_max_cpu_usage: None,
             custom_max_gpu_usage: vec![],
             paper_wallet_enabled: true,
-            reset_earnings: false,
             eco_mode_cpu_options: Vec::new(),
             ludicrous_mode_cpu_options: Vec::new(),
             custom_mode_cpu_options: Vec::new(),
@@ -338,6 +335,7 @@ impl AppConfig {
             airdrop_tokens: None,
             ootle_enabled: true,
             ootle_node_enabled: false,
+            gpu_engine: EngineType::OpenCL.to_string(),
         }
     }
 
@@ -371,12 +369,8 @@ impl AppConfig {
                 debug!("Loaded config from file {:?}", config);
                 self.config_version = config.version;
                 self.mode = MiningMode::from_str(&config.mode).unwrap_or(MiningMode::Eco);
-                if Network::get_current_or_user_setting_or_default() == Network::Esmeralda {
-                    self.display_mode =
-                        DisplayMode::from_str(&config.display_mode).unwrap_or(DisplayMode::Light);
-                } else {
-                    self.display_mode = DisplayMode::Light;
-                }
+                self.display_mode =
+                    DisplayMode::from_str(&config.display_mode).unwrap_or(DisplayMode::System);
                 self.mine_on_app_start = config.mine_on_app_start;
                 self.p2pool_enabled = config.p2pool_enabled;
                 self.last_binaries_update_timestamp = config.last_binaries_update_timestamp;
@@ -402,13 +396,7 @@ impl AppConfig {
                 self.custom_max_cpu_usage = config.custom_max_cpu_usage;
                 self.custom_max_gpu_usage = config.custom_max_gpu_usage.unwrap_or(vec![]);
                 self.auto_update = config.auto_update;
-                self.reset_earnings = config.reset_earnings;
                 self.custom_power_levels_enabled = config.custom_power_levels_enabled;
-                if Network::get_current_or_user_setting_or_default() == Network::Esmeralda {
-                    self.reset_earnings = config.reset_earnings;
-                } else {
-                    self.reset_earnings = false;
-                }
                 self.sharing_enabled = config.sharing_enabled;
                 self.visual_mode = config.visual_mode;
                 self.window_settings = config.window_settings;
@@ -418,6 +406,7 @@ impl AppConfig {
                 self.last_changelog_version = config.last_changelog_version;
                 self.airdrop_tokens = config.airdrop_tokens;
                 self.ootle_enabled = config.ootle_enabled;
+                self.gpu_engine = config.gpu_engine;
 
                 KEYRING_ACCESSED.store(
                     config.keyring_accessed,
@@ -499,6 +488,13 @@ impl AppConfig {
 
     pub fn last_changelog_version(&self) -> &str {
         &self.last_changelog_version
+    }
+
+    pub fn gpu_engine(&self) -> EngineType {
+        match EngineType::from_string(&self.gpu_engine) {
+            Ok(engine) => engine,
+            Err(_) => EngineType::OpenCL,
+        }
     }
 
     pub async fn set_mode(
@@ -815,6 +811,8 @@ impl AppConfig {
         ootle_node_enabled: bool,
     ) -> Result<(), anyhow::Error> {
         self.ootle_node_enabled = ootle_node_enabled;
+    pub async fn set_gpu_engine(&mut self, engine: &str) -> Result<(), anyhow::Error> {
+        self.gpu_engine = engine.to_string();
         self.update_config_file().await?;
         Ok(())
     }
@@ -849,7 +847,6 @@ impl AppConfig {
             custom_max_cpu_usage: self.custom_max_cpu_usage,
             custom_max_gpu_usage: Some(self.custom_max_gpu_usage.clone()),
             use_tor: self.use_tor,
-            reset_earnings: self.reset_earnings,
             eco_mode_cpu_options: self.eco_mode_cpu_options.clone(),
             ludicrous_mode_cpu_options: self.ludicrous_mode_cpu_options.clone(),
             custom_mode_cpu_options: self.custom_mode_cpu_options.clone(),
@@ -870,6 +867,7 @@ impl AppConfig {
             airdrop_tokens: self.airdrop_tokens.clone(),
             ootle_enabled: self.ootle_enabled,
             ootle_node_enabled: self.ootle_node_enabled,
+            gpu_engine: self.gpu_engine.clone(),
         };
         let config = serde_json::to_string(config)?;
         debug!(target: LOG_TARGET, "Updating config file: {:?} {:?}", file, self.clone());
@@ -896,7 +894,7 @@ fn default_mode() -> String {
 }
 
 fn default_display_mode() -> String {
-    "light".to_string()
+    "system".to_string()
 }
 
 fn default_false() -> bool {
@@ -917,6 +915,10 @@ fn default_system_time() -> SystemTime {
 
 fn default_monero_address() -> String {
     DEFAULT_MONERO_ADDRESS.to_string()
+}
+
+fn default_gpu_engine() -> String {
+    EngineType::OpenCL.to_string()
 }
 
 async fn create_monereo_address(path: PathBuf) -> Result<String, anyhow::Error> {

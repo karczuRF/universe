@@ -45,7 +45,7 @@ impl Binaries {
             Binaries::MinotariNode => "minotari_node",
             Binaries::Wallet => "wallet",
             Binaries::ShaP2pool => "sha-p2pool",
-            Binaries::GpuMiner => "xtrgpuminer",
+            Binaries::GpuMiner => "glytex",
             Binaries::Tor => "tor",
             Binaries::TariValidatorNode => "tari_validator_node",
             Binaries::TariIndexer => "tari_indexer",
@@ -59,7 +59,7 @@ impl Binaries {
             "minotari_node" => Binaries::MinotariNode,
             "wallet" => Binaries::Wallet,
             "sha-p2pool" => Binaries::ShaP2pool,
-            "xtrgpuminer" => Binaries::GpuMiner,
+            "glytex" => Binaries::GpuMiner,
             "tor" => Binaries::Tor,
             "tari_validator_node" => Binaries::TariValidatorNode,
             "tari_indexer" => Binaries::TariIndexer,
@@ -90,7 +90,7 @@ impl Binaries {
                 PathBuf::from(file_name)
             }
             Binaries::GpuMiner => {
-                let file_name = "xtrgpuminer";
+                let file_name = "glytex";
                 PathBuf::from(file_name)
             }
             Binaries::Tor => {

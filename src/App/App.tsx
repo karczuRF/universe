@@ -1,26 +1,29 @@
-import * as Sentry from '@sentry/react';
 import { memo, useMemo } from 'react';
-import { AppContentContainer } from '@app/App/App.styles';
-import { useShuttingDown } from '@app/hooks';
-
-import { useAppStateStore } from '@app/store/appStateStore';
-import { LazyMotion, domAnimation, AnimatePresence } from 'motion/react';
-import { useUIStore } from '@app/store/useUIStore.ts';
 import { useTranslation } from 'react-i18next';
+import { LazyMotion, domAnimation, AnimatePresence } from 'motion/react';
 
+import { useIsAppReady } from '../hooks/app/isAppReady.ts';
+import { useShuttingDown } from '../hooks';
+
+import { useAppStateStore } from '../store/appStateStore';
+import { setError, setIsWebglNotSupported } from '../store/actions';
+import { GlobalReset, GlobalStyle } from '../theme/GlobalStyle.ts';
+import ThemeProvider from '../theme/ThemeProvider.tsx';
+import Splashscreen from '../containers/phase/Splashscreen/Splashscreen.tsx';
 import ShuttingDownScreen from '../containers/phase/ShuttingDownScreen/ShuttingDownScreen.tsx';
 import FloatingElements from '../containers/floating/FloatingElements.tsx';
 import MainView from '../containers/main/MainView.tsx';
 import Setup from '../containers/phase/Setup/Setup';
 
-import { GlobalReset, GlobalStyle } from '../theme/GlobalStyle.ts';
-import ThemeProvider from '../theme/ThemeProvider.tsx';
-import { useIsAppReady } from '@app/hooks/app/isAppReady.ts';
-import Splashscreen from '@app/containers/phase/Splashscreen/Splashscreen.tsx';
+import { AppContentContainer } from './App.styles.ts';
 
-const CurrentAppSection = memo(function CurrentAppSection() {
-    const isAppReady = useIsAppReady();
-    const isShuttingDown = useShuttingDown();
+const CurrentAppSection = memo(function CurrentAppSection({
+    isAppReady,
+    isShuttingDown,
+}: {
+    isAppReady?: boolean;
+    isShuttingDown?: boolean;
+}) {
     const isSettingUp = useAppStateStore((s) => !s.setupComplete);
 
     const currentSection = useMemo(() => {
@@ -59,27 +62,27 @@ const CurrentAppSection = memo(function CurrentAppSection() {
         }
     }, [isAppReady, isSettingUp, isShuttingDown]);
 
-    return <AnimatePresence mode="popLayout">{currentSection}</AnimatePresence>;
+    return <AnimatePresence>{currentSection}</AnimatePresence>;
 });
 
 export default function App() {
-    const setError = useAppStateStore((s) => s.setError);
-    const setIsWebglNotSupported = useUIStore((s) => s.setIsWebglNotSupported);
+    const isAppReady = useIsAppReady();
+    const isShuttingDown = useShuttingDown();
 
     const { t } = useTranslation('common', { useSuspense: false });
 
     if (!window.WebGL2RenderingContext && !window.WebGLRenderingContext) {
-        Sentry.captureMessage('WebGL not supported by the browser', { extra: { userAgent: navigator.userAgent } });
+        console.error(`WebGL not supported by the browser - userAgent: ${navigator.userAgent}`);
         setIsWebglNotSupported(true);
         setError(t('webgl-not-supported'));
     }
     return (
         <ThemeProvider>
             <GlobalReset />
-            <GlobalStyle />
+            <GlobalStyle $hideCanvas={!isAppReady || isShuttingDown} />
             <LazyMotion features={domAnimation} strict>
                 <FloatingElements />
-                <CurrentAppSection />
+                <CurrentAppSection isAppReady={isAppReady} isShuttingDown={isShuttingDown} />
             </LazyMotion>
         </ThemeProvider>
     );

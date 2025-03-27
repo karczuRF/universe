@@ -10,11 +10,8 @@ import LinkIcon from './LinkIcon';
 export default function Invite() {
     const airdropUrl = useAirdropStore((state) => state.backendInMemoryConfig?.airdropUrl || '');
     const { t } = useTranslation(['airdrop'], { useSuspense: false });
-    const { userDetails, referralQuestPoints } = useAirdropStore();
-
-    const referralCode = userDetails?.user?.referral_code || '';
-
     const [copied, setCopied] = useState(false);
+    const referralCode = useAirdropStore((s) => s.userDetails?.user?.referral_code || '');
 
     const url = `${airdropUrl}/download/${referralCode}`;
 
@@ -50,12 +47,12 @@ export default function Invite() {
                 <LinkIcon />
 
                 <TextWrapper>
-                    <Title>{t('inviteFirends')}</Title>
+                    <Title>{t('inviteFriends')}</Title>
                     <Text>{t('inviteFriendsText')}</Text>
                 </TextWrapper>
 
                 <GemPill>
-                    {(referralQuestPoints?.pointsForClaimingReferral || REFERRAL_GEMS).toLocaleString()}
+                    {REFERRAL_GEMS.toLocaleString()}
                     <Image src={gemImage} alt="" />
                 </GemPill>
             </InviteButton>

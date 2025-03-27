@@ -1,12 +1,12 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 
 import { toastVariants } from './motion';
-import { ToastType, useToastStore } from '../useToastStore';
+import { removeToast, ToastType } from '../useToastStore';
 
 import { Wrapper, CloseButton, ToastContent, ProgressCircle, Title, Text } from './styles';
 import { useMotionValue } from 'motion/react';
 
-export interface Props {
+interface ToastProps {
     id?: number | string;
     index?: number;
     title: string;
@@ -16,20 +16,18 @@ export interface Props {
     type?: ToastType;
 }
 
-export const Toast = ({ id, index, title, text, timeout = 4500, isHovered = false, type = 'default' }: Props) => {
+export const Toast = ({ id, index, title, text, timeout = 4500, isHovered = false, type = 'default' }: ToastProps) => {
     const [show, setShow] = useState(false);
     const [positionVariant, setPositionVariant] = useState('hidden');
     const progress = useMotionValue(0);
     const progressInterval = useRef<NodeJS.Timeout>();
     const elapsedTimeRef = useRef<number>(0);
     const lastUpdateRef = useRef<number>(Date.now());
-    const { removeToast } = useToastStore();
     const [finished, setFinished] = useState(false);
 
     const handleHide = useCallback((id: number | string = 0) => {
         setShow(false);
         removeToast(id);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {

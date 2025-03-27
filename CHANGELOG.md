@@ -1,3 +1,135 @@
+# TARI UNIVERSE v0.9.823: Pool of Fortune
+
+_March 20, 2025_
+
+Hey Tari Fam,
+Welcome to Pool of Fortune, the latest release of Tari Universe. Pool of Fortune is a celebration of your OG status. You are a rebel, a maverick, and a pioneer. Nothing in the world is quite like Tari, and you are undeniably early. Here’s what contributors have been cooking up for you and everyone in the amazing Tari community: 
+
+🚀 WHAT'S NEW
+⏸️ Pause & Resume - Services now pause and resync automatically in sleep mode
+🎛️ MacOS GPU Options - Added Metal vs OpenCL engine selection (for testing)
+📊 Better GPU Detection - Improved accuracy in identifying GPU hardware
+🛠️ Crash Fix - Resolved issue when changing custom power levels
+🐧 Linux Naming Consistency - App names now use lowercase
+📏 Window Sizing Limits - Prevented windows from exceeding screen area
+⚠️ Install Folder Warning - Fixed incorrect directory warning during installation
+🔄 xtrgpuminer → Glytex - Renamed for better AV compatibility
+📡 Network Bandwidth Detection - Currently telemetry-only (alert thresholds coming soon!)
+🎨 UI Tweaks - Minor theme fixes for a smoother experience
+
+While this release is chock full of improvements, Tari contributors aren't stopping. Here are things to look forward to in upcoming releases of the one and only Tari Universe: 
+⚡ Setup & Sync Speed - Faster initial setup and improved sync reliability
+🏗️ Fork & Orphan Chain Avoidance - Strengthening consensus and stability
+🎯 Win Rate Optimization - Enhancing miner efficiency
+😉 Much more
+
+See you in the Tari Universe 💜🐢
+__
+
+# TARI UNIVERSE v0.9.817: The Path Less Traveled
+
+_March 12, 2025_
+
+## 🚀 Hey Tari Fam,
+
+The Testnet has been reset! A quick reminder:
+1️⃣ You may still see a fork message for 30 minutes—just ignore it.
+2️⃣ Your tXTM balance has been reset to 0.
+
+---
+
+# 🌑 TARI UNIVERSE v0.9.813: The Tide’s Forge Episode 2
+
+_March 6, 2025_
+
+## Hey Tari Fam,
+
+The journey to mainnet continues with another round of performance enhancements and fixes. This release brings several GPU-related improvements, more responsive mining behavior, and refinements to system settings. Thank you all for being Tari OGs —Tari exists because of you! 💜🐢
+
+## WHAT'S NEW  
+
+🎨 Visual Mode Update - Full canvas mode has been removed.
+⏳ Faster Miner Recovery - Lowered XMRig retry time from 5s to 1s for quicker reconnections.
+🎮 GPU Stability Enhancements - Refactored GPU-related deadlock handling.
+🔄 GPU Device Fix - Resolved issues with toggling GPU mining on/off.
+🔔 Windows UAC Update - The UAC dialog (security prompt when updating)  now displays a clearer Tari Universe name.
+♻️ Better App Restarts - Improved reliability of restarts across all scenarios.
+⚙️ Settings Reset Dialog - Enhanced confirmation dialog before resetting settings.
+🌗 Dark Mode Behavior - Now defaults to the system setting.
+
+---
+
+# 🌑 TARI UNIVERSE v0.9.811: The Tide’s Forge Episode 1
+
+_March 3, 2025_
+
+## Hi Everyone,  
+With mainnet coming in April, Tari contributors continue to work on bugs and improve the overall Tari Universe experience. Introducing the Tide’s Forge series of TU releases. These releases are focused on continued optimization, reliability, and performance improvements across the board. Thank you for your feedback and being a part of the Tari community. Tari exists for one reason: you 💜🐢
+
+## WHAT'S NEW  
+🔵 Unread pill count fix - No more incorrect badge counts!  
+💰 mmproxy fix - We believe this resolves XTM estimated earnings issues.  
+🔄 Updater improvements - Ensures the *"new version"* dialog appears for units that don’t auto-update. 
+📱 Aurora QR code sync fix - Seamless syncing to phone on macOS.  
+♻️ Restart reliability - Fixes cases where the app wouldn’t restart properly after an auto-update.  
+🐞 More deadlock fixes - Addresses sync freezes on startup.  
+🤝 p2pool fix - Resolves issues with absent peers.  
+
+---
+
+# 🌑 TARI UNIVERSE v0.9.809: The Dawn of Dork Mode  
+
+_February 26, 2025_
+
+## 👋 Hello Everyone,  
+The wait is over—**Dark (Dork!) Mode** is here! 🎉 Welcome our Prince and Princesses of Darkness. Our fellow Darth Vaders, Cruella De Vils, and Voldemorts. Dark mode is for you. Welcome home 💜🌚
+
+✨ You can enable **Dark Mode** in **⚙️ Settings**.  
+
+## 🔜 Coming Soon
+🔵 Wallet unread wins count fix
+🔄 Fixing restart issues - Sometimes, the app doesn’t restart properly after an auto-update
+🐞 More deadlock fixes - Addressing sync freezes on startup
+💻 Laptop sleep mode recovery - UX handling here needs review
+🚀 A surprise…
+
+---
+
+# TARI UNIVERSE v0.9.807: Hotfix Released! 
+
+_February 18, 2025_
+
+## Hi Everyone,  
+This fork challenge has proven to be a beast! Our valiant contributors will never give up! Introducing Tari Universe v0.9.807, revenge of the fork slayer. Please let us know if you continue to see the yellow fork message (we sure hope not!). Thank you fam! 💎
+
+---
+
+# 🌟 TARI UNIVERSE v0.9.805: The Great Pool War, Episode 3
+
+_February 17, 2025_
+
+Dear Community,
+
+As the great pool war enters its 3rd phase, p2pool has maintained its ~80%+ win rate per 24 hours, rising to 90% for those mining for more than six hours. We are (largely) winning fam. Even if you're on the lower end of the hash rate spectrum (e.g., <1000 h/s CPU), each winning share can continue paying out for up to 12 hours—so keep the mining party rolling!
+
+## ✨ What's New
+
+- 🛠 **Resolved app load sequence freezes.**  
+- 🎭 **Animation fixes** improved reliability of state transitions.  
+- ⚠️ **Airdrop login button failures** traced to unsupported Ubuntu versions and missing OS dependencies.  
+  - ✅ **Minimum Ubuntu version: 22**  
+  - 📝 We're working on a more robust Linux FAQ since most issues stem from OS flavor/version mismatches. 
+
+## **Coming Soon**
+
+- ⚖️ More P2Pool fixes for lower hash power levels
+- ⚙️ Restorationof persistent window settings
+- 🖥️ Enhanced GPU support, monitoring, and reporting
+- 📋 Roadmap for older OS and GPU support, minimum OS versions
+- 🔉 A surprise… 
+
+---
+
 # 🌟 TARI UNIVERSE v0.9.6: The Great Pool War, Episode 2
 
 _February 6, 2025_

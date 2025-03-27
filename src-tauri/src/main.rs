@@ -40,21 +40,25 @@ use port_allocator::PortAllocator;
 use process_stats_collector::ProcessStatsCollectorBuilder;
 use release_notes::ReleaseNotes;
 use serde_json::json;
-use std::fs::{remove_dir_all, remove_file};
+use std::fs::{create_dir_all, remove_dir_all, remove_file, File};
 use std::path::Path;
 use systemtray_manager::{SystemTrayData, SystemTrayManager};
+use tasks_tracker::TasksTracker;
 use tauri_plugin_cli::CliExt;
 use telemetry_service::TelemetryService;
 use tokio::sync::watch::{self};
 use updates_manager::UpdatesManager;
+use utils::app_flow_utils::FrontendReadyChannel;
 use utils::locks_utils::{try_read_with_retry, try_write_with_retry};
+use utils::network_status::NetworkStatus;
+use utils::system_status::SystemStatus;
 use validator_node_manager::{ValidatorNodeConfig, ValidatorNodeManager};
 use wallet_adapter::WalletState;
 
 use log4rs::config::RawConfig;
 use serde::Serialize;
 use std::fs;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
@@ -95,7 +99,7 @@ use crate::tor_manager::TorManager;
 use crate::wallet_manager::WalletManager;
 #[cfg(target_os = "macos")]
 use utils::macos_utils::is_app_in_applications_folder;
-use utils::shutdown_utils::stop_all_processes;
+use utils::shutdown_utils::resume_all_processes;
 
 mod airdrop;
 mod app_config;
@@ -117,6 +121,7 @@ mod feedback;
 mod github;
 mod gpu_miner;
 mod gpu_miner_adapter;
+mod gpu_status_file;
 mod hardware;
 mod indexer_adapter;
 mod indexer_manager;
@@ -140,10 +145,12 @@ mod process_watcher;
 mod progress_tracker;
 mod release_notes;
 mod systemtray_manager;
+mod tasks_tracker;
 mod telemetry_manager;
 mod telemetry_service;
 mod tests;
 mod tor_adapter;
+mod tor_control_client;
 mod tor_manager;
 mod updates_manager;
 mod utils;
@@ -155,6 +162,7 @@ mod xmrig;
 mod xmrig_adapter;
 
 const LOG_TARGET: &str = "tari::universe::main";
+const RESTART_EXIT_CODE: i32 = i32::MAX;
 #[cfg(not(any(feature = "release-ci", feature = "release-ci-beta")))]
 const APPLICATION_FOLDER_ID: &str = "com.tari.universe.alpha";
 #[cfg(all(feature = "release-ci", feature = "release-ci-beta"))]
@@ -184,30 +192,17 @@ struct CriticalProblemEvent {
 #[allow(clippy::too_many_lines)]
 async fn initialize_frontend_updates(app: &tauri::AppHandle) -> Result<(), anyhow::Error> {
     let move_app = app.clone();
-    tauri::async_runtime::spawn(async move {
+    TasksTracker::current().spawn(async move {
         let app_state = move_app.state::<UniverseAppState>().clone();
 
         let _ = &app_state
             .events_manager
             .handle_internal_wallet_loaded_or_created(&move_app)
             .await;
-        let gpu_devices = match HardwareStatusMonitor::current().get_gpu_devices().await {
-            Ok(devices) => devices,
-            Err(e) => {
-                let err_msg = format!("Failed to get GPU devices: {:?}", e);
-                error!(target: LOG_TARGET, "{}", err_msg);
-                sentry::capture_message(&err_msg, sentry::Level::Error);
-                vec![]
-            }
-        };
-        let _ = &app_state
-            .events_manager
-            .handle_gpu_devices_update(&move_app, gpu_devices)
-            .await;
     });
 
     let move_app = app.clone();
-    tauri::async_runtime::spawn(async move {
+    TasksTracker::current().spawn(async move {
         let app_state = move_app.state::<UniverseAppState>().clone();
 
         let mut node_status_watch_rx = (*app_state.node_status_watch_rx).clone();
@@ -237,28 +232,8 @@ async fn initialize_frontend_updates(app: &tauri::AppHandle) -> Result<(), anyho
                 },
                 _ = gpu_status_watch_rx.changed() => {
                     let gpu_status: GpuMinerStatus = gpu_status_watch_rx.borrow().clone();
-                    let node_status: BaseNodeStatus = node_status_watch_rx.borrow().clone();
 
-                    let gpu_miner = match try_read_with_retry(&app_state.gpu_miner, 6).await {
-                        Ok(gm) => gm,
-                        Err(e) => {
-                            let err_msg = format!("Failed to acquire gpu_miner read lock: {}", e);
-                            error!(target: LOG_TARGET, "{}", err_msg);
-                            sentry::capture_message(&err_msg, sentry::Level::Error);
-                            continue;
-                        }
-                    };
-
-                    if let Ok(gpu_status) = gpu_miner
-                        .status(node_status.sha_network_hashrate, node_status.block_reward, gpu_status.clone())
-                        .await
-                    {
-                        let _ = &app_state.events_manager.handle_gpu_mining_update(&move_app, gpu_status).await;
-                    } else {
-                        let err_msg = "Error getting gpu miner status";
-                        error!(target: LOG_TARGET, "{}", err_msg);
-                        sentry::capture_message(err_msg, sentry::Level::Error);
-                    };
+                    let _ = &app_state.events_manager.handle_gpu_mining_update(&move_app, gpu_status).await;
                 },
                 _ = cpu_miner_status_watch_rx.changed() => {
                     let cpu_status = cpu_miner_status_watch_rx.borrow().clone();
@@ -292,7 +267,8 @@ async fn initialize_frontend_updates(app: &tauri::AppHandle) -> Result<(), anyho
     });
 
     let move_app = app.clone();
-    tauri::async_runtime::spawn(async move {
+
+    TasksTracker::current().spawn(async move {
         let app_state = move_app.state::<UniverseAppState>().clone();
         let mut shutdown_signal = app_state.shutdown.to_signal();
         let mut interval = time::interval(Duration::from_secs(10));
@@ -326,6 +302,7 @@ async fn setup_inner(
     state: tauri::State<'_, UniverseAppState>,
     app: tauri::AppHandle,
 ) -> Result<(), anyhow::Error> {
+    FrontendReadyChannel::current().wait_for_ready().await?;
     app.emit(
         "setup_message",
         SetupStatusEvent {
@@ -397,18 +374,22 @@ async fn setup_inner(
 
     let cpu_miner_config = state.cpu_miner_config.read().await;
     let app_config = state.config.read().await;
+
     let use_tor = app_config.use_tor();
     let p2pool_enabled = app_config.p2pool_enabled();
     drop(app_config);
+
     let mm_proxy_manager = state.mm_proxy_manager.clone();
 
     let is_auto_launcher_enabled = state.config.read().await.should_auto_launch();
-    AutoLauncher::current()
+    let _unused = AutoLauncher::current()
         .initialize_auto_launcher(is_auto_launcher_enabled)
-        .await?;
+        .await
+        .inspect_err(|e| error!(target: LOG_TARGET, "Could not initialize auto launcher: {:?}", e));
 
     let (tx, rx) = watch::channel("".to_string());
     let progress = ProgressTracker::new(app.clone(), Some(tx));
+    progress.set_max(1).await;
 
     let last_binaries_update_timestamp = state.config.read().await.last_binaries_update_timestamp();
     let now = SystemTime::now();
@@ -447,17 +428,35 @@ async fn setup_inner(
         > Duration::from_secs(60 * 60 * 6);
     // let should_check_for_update = false; // TODO tmp solution
 
+    telemetry_service
+        .send(
+            "benchmarking-network".to_string(),
+            json!({
+                "service": "speedtest",
+                "percentage": 0,
+            }),
+        )
+        .await?;
+    progress.set_max(5).await;
+    progress
+        .update("benchmarking-network".to_string(), None, 0)
+        .await;
+
+    NetworkStatus::current()
+        .run_speed_test_with_timeout(&app)
+        .await;
+
     if use_tor && !cfg!(target_os = "macos") {
         telemetry_service
             .send(
                 "checking-latest-version-tor".to_string(),
                 json!({
                     "service": "tor_manager",
-                    "percentage": 0,
+                    "percentage": 5,
                 }),
             )
             .await?;
-        progress.set_max(5).await;
+        progress.set_max(10).await;
         progress
             .update("checking-latest-version-tor".to_string(), None, 0)
             .await;
@@ -477,11 +476,11 @@ async fn setup_inner(
             "checking-latest-version-node".to_string(),
             json!({
                 "service": "node_manager",
-                "percentage": 5,
+                "percentage": 10,
             }),
         )
         .await;
-    progress.set_max(10).await;
+    progress.set_max(15).await;
     progress
         .update("checking-latest-version-node".to_string(), None, 0)
         .await;
@@ -500,11 +499,11 @@ async fn setup_inner(
             "checking-latest-version-mmproxy".to_string(),
             json!({
                 "service": "mmproxy",
-                "percentage": 10,
+                "percentage": 15,
             }),
         )
         .await;
-    progress.set_max(15).await;
+    progress.set_max(20).await;
     progress
         .update("checking-latest-version-mmproxy".to_string(), None, 0)
         .await;
@@ -523,11 +522,11 @@ async fn setup_inner(
             "checking-latest-version-wallet".to_string(),
             json!({
                 "service": "wallet",
-                "percentage": 15,
+                "percentage": 20,
             }),
         )
         .await;
-    progress.set_max(20).await;
+    progress.set_max(25).await;
     progress
         .update("checking-latest-version-wallet".to_string(), None, 0)
         .await;
@@ -546,11 +545,11 @@ async fn setup_inner(
             "checking-latest-version-gpuminer".to_string(),
             json!({
                 "service": "gpuminer",
-                "percentage":20,
+                "percentage":25,
             }),
         )
         .await;
-    progress.set_max(25).await;
+    progress.set_max(30).await;
     progress
         .update("checking-latest-version-gpuminer".to_string(), None, 0)
         .await;
@@ -569,11 +568,11 @@ async fn setup_inner(
             "checking-latest-version-xmrig".to_string(),
             json!({
                 "service": "xmrig",
-                "percentage":25,
+                "percentage":30,
             }),
         )
         .await;
-    progress.set_max(30).await;
+    progress.set_max(35).await;
     progress
         .update("checking-latest-version-xmrig".to_string(), None, 0)
         .await;
@@ -592,11 +591,11 @@ async fn setup_inner(
             "checking-latest-version-sha-p2pool".to_string(),
             json!({
                 "service": "sha_p2pool",
-                "percentage":30,
+                "percentage":35,
             }),
         )
         .await;
-    progress.set_max(32).await;
+    progress.set_max(40).await;
     progress
         .update("checking-latest-version-sha-p2pool".to_string(), None, 0)
         .await;
@@ -620,12 +619,12 @@ async fn setup_inner(
                 "checking-latest-version-tari-validator-node".to_string(),
                 json!({
                     "service": "validator-node",
-                    "percentage":32,
+                    "percentage":40,
                 }),
             )
             .await;
 
-        progress.set_max(34).await;
+        progress.set_max(42).await;
         progress
             .update(
                 "checking-latest-version-tari-validator-node".to_string(),
@@ -649,13 +648,13 @@ async fn setup_inner(
                 "checking-latest-version-tari-indexer".to_string(),
                 json!({
                     "service": "tari-indexer",
-                    "percentage":34,
+                    "percentage":42,
                 }),
             )
             .await;
         //TODO tari ootle indexer binary
         // should check for update - for now is set to false because of local build
-        progress.set_max(36).await;
+        progress.set_max(45).await;
         progress
             .update("checking-latest-version-tari-indexer".to_string(), None, 0)
             .await;
@@ -683,16 +682,15 @@ async fn setup_inner(
         .gpu_miner
         .write()
         .await
-        .detect(config_dir.clone())
+        .detect(
+            app.clone(),
+            config_dir.clone(),
+            state.config.read().await.gpu_engine(),
+        )
         .await
         .inspect_err(|e| error!(target: LOG_TARGET, "Could not detect gpu miner: {:?}", e));
 
     HardwareStatusMonitor::current().initialize().await?;
-
-    progress.set_max(37).await;
-    progress
-        .update("waiting-for-minotari-node-to-start".to_string(), None, 0)
-        .await;
 
     let mut tor_control_port = None;
     if use_tor && !cfg!(target_os = "macos") {
@@ -709,14 +707,15 @@ async fn setup_inner(
     }
     let _unused = telemetry_service
         .send(
-            "waiting-for-tor-to-start".to_string(),
+            "waiting-for-minotari-node-to-start".to_string(),
             json!({
-                "service": "tor_manager",
-                "percentage":37,
+                "service": "minotari_node",
+                "percentage":40,
             }),
         )
         .await;
-    progress.set_max(38).await;
+
+    progress.set_max(45).await;
     progress
         .update("waiting-for-minotari-node-to-start".to_string(), None, 0)
         .await;
@@ -744,11 +743,11 @@ async fn setup_inner(
                                 "resetting-minotari-node-database".to_string(),
                                 json!({
                                     "service": "minotari_node",
-                                    "percentage":38,
+                                    "percentage":45,
                                 }),
                             )
                             .await;
-                        progress.set_max(39).await;
+                        progress.set_max(50).await;
                         progress
                             .update("minotari-node-restarting".to_string(), None, 0)
                             .await;
@@ -764,7 +763,16 @@ async fn setup_inner(
     }
     info!(target: LOG_TARGET, "Node has started and is ready");
 
-    progress.set_max(40).await;
+    let _unused = telemetry_service
+        .send(
+            "waiting-for-wallet".to_string(),
+            json!({
+                "service": "wallet",
+                "percentage":50,
+            }),
+        )
+        .await;
+    progress.set_max(55).await;
     progress
         .update("waiting-for-wallet".to_string(), None, 0)
         .await;
@@ -783,11 +791,11 @@ async fn setup_inner(
             "wallet-started".to_string(),
             json!({
                 "service": "wallet",
-                "percentage":40,
+                "percentage":55,
             }),
         )
         .await;
-    progress.set_max(45).await;
+    progress.set_max(60).await;
     progress.update("wallet-started".to_string(), None, 0).await;
     progress
         .update("waiting-for-node".to_string(), None, 0)
@@ -797,7 +805,7 @@ async fn setup_inner(
             "preparing-for-initial-sync".to_string(),
             json!({
                 "service": "initial_sync",
-                "percentage":45,
+                "percentage":60,
             }),
         )
         .await;
@@ -841,12 +849,13 @@ async fn setup_inner(
     drop(cpu_miner);
 
     if p2pool_enabled {
+        progress.set_max(80).await;
         let _unused = telemetry_service
             .send(
                 "starting-p2pool".to_string(),
                 json!({
                     "service": "starting_p2pool",
-                    "percentage":77,
+                    "percentage":80,
                 }),
             )
             .await;
@@ -875,18 +884,17 @@ async fn setup_inner(
             .await?;
     }
 
-    let _unused = telemetry_service
-        .send(
-            "starting-mmproxy".to_string(),
-            json!({
-                "service": "starting_mmproxy",
-                "percentage":85,
-            }),
-        )
-        .await;
-
     //TODO RUN OOTLE
     if state.config.read().await.ootle_enabled() {
+        let _unused = telemetry_service
+            .send(
+                "starting-ootle".to_string(),
+                json!({
+                    "service": "starting-ootle",
+                    "percentage":85,
+                }),
+            )
+            .await;
         progress.set_max(86).await;
         progress.update("starting-ootle".to_string(), None, 0).await;
 
@@ -933,11 +941,6 @@ async fn setup_inner(
 
         // run local node
         if state.config.read().await.ootle_node_enabled() {
-            progress.set_max(88).await;
-            progress
-                .update("starting-ootle-local-node".to_string(), None, 0)
-                .await;
-
             let _unused = telemetry_service
                 .send(
                     "starting-validator-node".to_string(),
@@ -946,6 +949,10 @@ async fn setup_inner(
                         "percentage":86,
                     }),
                 )
+                .await;
+            progress.set_max(87).await;
+            progress
+                .update("starting-validator-node".to_string(), None, 0)
                 .await;
 
             let base_node_grpc = state.node_manager.get_grpc_port().await?;
@@ -974,14 +981,14 @@ async fn setup_inner(
                     "starting-tari-indexer".to_string(),
                     json!({
                         "service": "starting-tari-indexer",
-                        "percentage":88,
+                        "percentage":87,
                     }),
                 )
                 .await;
 
             progress.set_max(90).await;
             progress
-                .update("starting-ootle-indexer".to_string(), None, 0)
+                .update("starting-tari-indexe".to_string(), None, 0)
                 .await;
             let indexer_config = IndexerConfig::builder()
                 .with_base_node(base_node_grpc)
@@ -1000,18 +1007,18 @@ async fn setup_inner(
                 .await?;
 
             info!(target: LOG_TARGET, "🚀 Ootle enabled & Tari Indexer started");
-            let _unused = telemetry_service
-                .send(
-                    "starting-mmproxy".to_string(),
-                    json!({
-                        "service": "starting-mmproxy",
-                        "percentage":90,
-                    }),
-                )
-                .await;
         }
     }
 
+    let _unused = telemetry_service
+        .send(
+            "starting-mmproxy".to_string(),
+            json!({
+                "service": "starting-mmproxy",
+                "percentage":90,
+            }),
+        )
+        .await;
     progress.set_max(100).await;
     progress
         .update("starting-mmproxy".to_string(), None, 0)
@@ -1070,34 +1077,63 @@ async fn setup_inner(
 
     // TODO disable orphan checker for local node
     let app_handle_clone: tauri::AppHandle = app.clone();
-    tauri::async_runtime::spawn(async move {
+    let mut shutdown_signal = state.shutdown.to_signal();
+    TasksTracker::current().spawn(async move {
         let mut interval: time::Interval = time::interval(Duration::from_secs(30));
         let mut has_send_error = false;
 
         loop {
-            let state = app_handle_clone.state::<UniverseAppState>().inner();
-            if state.shutdown.is_triggered() {
-                break;
+            tokio::select! {
+                _ = interval.tick() => {
+                    let state = app_handle_clone.state::<UniverseAppState>().inner();
+                    let check_if_orphan = state
+                        .node_manager
+                        .check_if_is_orphan_chain(!has_send_error)
+                        .await;
+                    match check_if_orphan {
+                        Ok(is_stuck) => {
+                            if is_stuck {
+                                error!(target: LOG_TARGET, "Miner is stuck on orphan chain");
+                            }
+                            if is_stuck && !has_send_error {
+                                has_send_error = true;
+                            }
+                            drop(app_handle_clone.emit("is_stuck", is_stuck));
+                        }
+                        Err(ref e) => {
+                            error!(target: LOG_TARGET, "{}", e);
+                        }
+                    }
+                },
+                _ = shutdown_signal.wait() => {
+                    info!(target: LOG_TARGET, "Stopping periodic orphan chain checks");
+                    break;
+                }
             }
+        }
+    });
 
-            interval.tick().await;
-            let check_if_orphan = state
-                .node_manager
-                .check_if_is_orphan_chain(!has_send_error)
-                .await;
-            match check_if_orphan {
-                Ok(is_stuck) => {
-                    if is_stuck {
-                        error!(target: LOG_TARGET, "Miner is stuck on orphan chain");
-                    }
-                    if is_stuck && !has_send_error {
-                        has_send_error = true;
-                    }
-                    drop(app_handle_clone.emit("is_stuck", is_stuck));
+    let app_handle_clone: tauri::AppHandle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let mut receiver = SystemStatus::current().get_sleep_mode_watcher();
+        let mut last_state = *receiver.borrow();
+        loop {
+            if receiver.changed().await.is_ok() {
+                let current_state = *receiver.borrow();
+
+                if last_state && !current_state {
+                    info!(target: LOG_TARGET, "System is no longer in sleep mode");
+                    let _unused = resume_all_processes(app_handle_clone.clone()).await;
                 }
-                Err(ref e) => {
-                    error!(target: LOG_TARGET, "{}", e);
+
+                if !last_state && current_state {
+                    info!(target: LOG_TARGET, "System entered sleep mode");
+                    TasksTracker::stop_all_processes(app_handle_clone.clone()).await;
                 }
+
+                last_state = current_state;
+            } else {
+                error!(target: LOG_TARGET, "Failed to receive sleep mode change");
             }
         }
     });
@@ -1147,12 +1183,6 @@ struct UniverseAppState {
     ootle_wallet: Arc<RwLock<OotleWallet>>,
 }
 
-#[derive(Clone, serde::Serialize)]
-struct Payload {
-    args: Vec<String>,
-    cwd: String,
-}
-
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct FEPayload {
     token: Option<String>,
@@ -1160,6 +1190,16 @@ struct FEPayload {
 
 #[allow(clippy::too_many_lines)]
 fn main() {
+    #[cfg(debug_assertions)]
+    {
+        if cfg!(tokio_unstable) {
+            console_subscriber::init();
+        } else {
+            println!(
+                "Tokio console disabled. To enable, run with: RUSTFLAGS=\"--cfg tokio_unstable\""
+            );
+        }
+    }
     let _unused = fix_path_env::fix();
     // TODO: Integrate sentry into logs. Because we are using Tari's logging infrastructure, log4rs
     // sets the logger and does not expose a way to add sentry into it.
@@ -1184,6 +1224,7 @@ fn main() {
     let node_manager = NodeManager::new(base_node_watch_tx, &mut stats_collector);
     let (wallet_state_watch_tx, wallet_state_watch_rx) =
         watch::channel::<Option<WalletState>>(None);
+    let (gpu_status_tx, gpu_status_rx) = watch::channel(GpuMinerStatus::default());
     let (cpu_miner_status_watch_tx, cpu_miner_status_watch_rx) =
         watch::channel::<CpuMinerStatus>(CpuMinerStatus::default());
     let wallet_manager = WalletManager::new(
@@ -1210,7 +1251,6 @@ fn main() {
     let app_in_memory_config =
         Arc::new(RwLock::new(app_in_memory_config::AppInMemoryConfig::init()));
 
-    let (gpu_status_tx, gpu_status_rx) = watch::channel(GpuMinerStatus::default());
     let cpu_miner: Arc<RwLock<CpuMiner>> = Arc::new(
         CpuMiner::new(
             &mut stats_collector,
@@ -1219,12 +1259,19 @@ fn main() {
         )
         .into(),
     );
-    let gpu_miner: Arc<RwLock<GpuMiner>> =
-        Arc::new(GpuMiner::new(gpu_status_tx, &mut stats_collector).into());
+    let gpu_miner: Arc<RwLock<GpuMiner>> = Arc::new(
+        GpuMiner::new(
+            gpu_status_tx,
+            base_node_watch_rx.clone(),
+            &mut stats_collector,
+        )
+        .into(),
+    );
 
     let app_config_raw = AppConfig::new();
     let app_config = Arc::new(RwLock::new(app_config_raw.clone()));
-    let tor_manager = TorManager::new(&mut stats_collector);
+    let (tor_watch_tx, tor_watch_rx) = watch::channel(None);
+    let tor_manager = TorManager::new(tor_watch_tx, &mut stats_collector);
     let mm_proxy_manager = MmProxyManager::new(&mut stats_collector);
 
     let telemetry_manager: TelemetryManager = TelemetryManager::new(
@@ -1235,9 +1282,14 @@ fn main() {
         gpu_status_rx.clone(),
         base_node_watch_rx.clone(),
         p2pool_stats_rx.clone(),
+        tor_watch_rx.clone(),
         stats_collector.build(),
     );
-    let telemetry_service = TelemetryService::new(app_config.clone(), app_in_memory_config.clone());
+    let telemetry_service = TelemetryService::new(
+        app_config.clone(),
+        app_in_memory_config.clone(),
+        shutdown.to_signal(),
+    );
     let updates_manager = UpdatesManager::new(app_config.clone(), shutdown.to_signal());
 
     let feedback = Feedback::new(app_in_memory_config.clone(), app_config.clone());
@@ -1290,10 +1342,15 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             println!("{}, {argv:?}, {cwd}", app.package_info().name);
 
-            app.emit("single-instance", Payload { args: argv, cwd })
-                .unwrap_or_else(
-                    |e| error!(target: LOG_TARGET, "Could not emit single-instance event: {:?}", e),
-                );
+            match app.get_webview_window("main") {
+                Some(w) => {
+                    let _unused = w.show().map_err(|err| error!(target: LOG_TARGET, "Couldn't show the main window {:?}", err));
+                    let _unused = w.set_focus();
+                },
+                None => {
+                    error!(target: LOG_TARGET, "Could not find main window");
+                }
+            };
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_cli::init())
@@ -1380,6 +1437,28 @@ fn main() {
                     error!(target: LOG_TARGET, "Could not remove tcp_tor_toggled file: {}", e);
                     e.to_string()
                 })?;
+            }
+
+            // TODO: Remove this in a few versions
+            // It exists for people who ran 0.9.803 and ended up on a fork
+            // Everyone needs a clean node db for 0.9.804, so lets wipe the db once, write this file
+            // and not require people to clear the db multiple times. Once we know nobody is on
+            // a version 0.9.803 or before
+            let feb_17_fork_reset = config_path.join("20250217-node-db-clean");
+            if !feb_17_fork_reset.exists() {
+                let network = Network::default().as_key_str();
+
+                let node_data_db = config_path.join("node").join(network).join("data");
+
+                // They may not exist. This could be first run.
+                if node_data_db.exists() {
+                    if let Err(e) = remove_dir_all(node_data_db) {
+                        warn!(target: LOG_TARGET, "Could not clear peer data folder: {}", e);
+                    }
+                }
+
+                create_dir_all(&config_path).map_err(|e| e.to_string())?;
+                File::create(feb_17_fork_reset).map_err(|e| e.to_string())?;
             }
 
             let cpu_config2 = cpu_config.clone();
@@ -1479,7 +1558,6 @@ fn main() {
             commands::set_auto_update,
             commands::set_cpu_mining_enabled,
             commands::set_display_mode,
-            commands::set_excluded_gpu_devices,
             commands::set_gpu_mining_enabled,
             commands::set_mine_on_app_start,
             commands::set_mode,
@@ -1502,6 +1580,7 @@ fn main() {
             commands::set_pre_release,
             commands::check_for_updates,
             commands::try_update,
+            commands::toggle_device_exclusion,
             commands::get_network,
             commands::sign_ws_data,
             commands::set_airdrop_tokens,
@@ -1524,7 +1603,8 @@ fn main() {
             commands::update_installed_tapplet,
             commands::set_ootle_enabled,
             commands::set_ootle_node_enabled,
-            commands::upload_wasm_file
+            commands::upload_wasm_file,
+            commands::set_selected_engine
         ])
         .build(tauri::generate_context!())
         .inspect_err(
@@ -1537,7 +1617,19 @@ fn main() {
         "Starting Tari Universe version: {}",
         app.package_info().version
     );
-    app.run(move |app_handle, event| match event {
+
+    let power_monitor = SystemStatus::current().start_listener();
+
+    let is_restart_requested = Arc::new(AtomicBool::new(false));
+    let is_restart_requested_clone = is_restart_requested.clone();
+
+    app.run(move |app_handle, event| {
+        // We can only receive system events from the event loop so this needs to be here
+        let _unused = SystemStatus::current().receive_power_event(&power_monitor).inspect_err(|e| {
+            error!(target: LOG_TARGET, "Could not receive power event: {:?}", e)
+        });
+
+        match event {
         tauri::RunEvent::Ready  => {
             info!(target: LOG_TARGET, "RunEvent Ready");
             let handle_clone = app_handle.clone();
@@ -1548,21 +1640,31 @@ fn main() {
                     .inspect_err(|e| error!(target: LOG_TARGET, "Could not setup app: {:?}", e));
             });
         }
-        tauri::RunEvent::ExitRequested { api: _, .. } => {
-            info!(target: LOG_TARGET, "App shutdown request caught");
-            let _unused = block_on(stop_all_processes(app_handle.clone(), true));
+        tauri::RunEvent::ExitRequested { api: _, code, .. } => {
+            info!(target: LOG_TARGET, "App shutdown request caught with code: {:#?}", code);
+            if let Some(exit_code) = code {
+                if exit_code == RESTART_EXIT_CODE {
+                    // RunEvent does not hold the exit code so we store it separately
+                    is_restart_requested.store(true, Ordering::SeqCst);
+                }
+            }
+            block_on(TasksTracker::stop_all_processes(app_handle.clone()));
             info!(target: LOG_TARGET, "App shutdown complete");
         }
         tauri::RunEvent::Exit => {
             info!(target: LOG_TARGET, "App shutdown caught");
-            let _unused = block_on(stop_all_processes(app_handle.clone(), true));
+            block_on(TasksTracker::stop_all_processes(app_handle.clone()));
+            if is_restart_requested_clone.load(Ordering::SeqCst) {
+                app_handle.cleanup_before_exit();
+                let env = app_handle.env();
+                tauri::process::restart(&env); // this will call exit(0) so we'll not return to the event loop
+            }
             info!(target: LOG_TARGET, "Tari Universe v{} shut down successfully", app_handle.package_info().version);
         }
         RunEvent::MainEventsCleared => {
             // no need to handle
         }
-        _ => {
-            debug!(target: LOG_TARGET, "Unhandled event: {:?}", event);
-        }
+        _ => {}
+    };
     });
 }
