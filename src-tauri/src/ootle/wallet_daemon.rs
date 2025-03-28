@@ -87,7 +87,7 @@ pub async fn spawn_wallet_daemon(
         config.dan_wallet_daemon.indexer_json_rpc_url
     );
 
-    match run_tari_dan_wallet_daemon(config, shutdown_signal).await {
+    match run_tari_dan_wallet_daemon(config, shutdown_signal, shutdown_signal).await {
         Ok(_) => {
             info!(target: LOG_TARGET, "🚀 Running wallet daemon");
             return Ok(());

@@ -168,7 +168,9 @@ impl Default for AppConfigFromFile {
             ootle_enabled: true,
             ootle_node_enabled: false,
             gpu_engine: default_gpu_engine(),
+        }
     }
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum DisplayMode {
@@ -517,6 +519,7 @@ impl AppConfig {
         self.set_max_gpu_usage(custom_max_gpu_usage).await?;
         Ok(())
     }
+
     pub async fn set_display_mode(&mut self, display_mode: String) -> Result<(), anyhow::Error> {
         let new_display_mode = match display_mode.as_str() {
             "system" => DisplayMode::System,
@@ -811,6 +814,10 @@ impl AppConfig {
         ootle_node_enabled: bool,
     ) -> Result<(), anyhow::Error> {
         self.ootle_node_enabled = ootle_node_enabled;
+        self.update_config_file().await?;
+        Ok(())
+    }
+
     pub async fn set_gpu_engine(&mut self, engine: &str) -> Result<(), anyhow::Error> {
         self.gpu_engine = engine.to_string();
         self.update_config_file().await?;

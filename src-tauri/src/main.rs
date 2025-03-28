@@ -49,7 +49,7 @@ use telemetry_service::TelemetryService;
 use tokio::sync::watch::{self};
 use updates_manager::UpdatesManager;
 use utils::app_flow_utils::FrontendReadyChannel;
-use utils::locks_utils::{try_read_with_retry, try_write_with_retry};
+use utils::locks_utils::try_write_with_retry;
 use utils::network_status::NetworkStatus;
 use utils::system_status::SystemStatus;
 use validator_node_manager::{ValidatorNodeConfig, ValidatorNodeManager};
@@ -1190,16 +1190,6 @@ struct FEPayload {
 
 #[allow(clippy::too_many_lines)]
 fn main() {
-    #[cfg(debug_assertions)]
-    {
-        if cfg!(tokio_unstable) {
-            console_subscriber::init();
-        } else {
-            println!(
-                "Tokio console disabled. To enable, run with: RUSTFLAGS=\"--cfg tokio_unstable\""
-            );
-        }
-    }
     let _unused = fix_path_env::fix();
     // TODO: Integrate sentry into logs. Because we are using Tari's logging infrastructure, log4rs
     // sets the logger and does not expose a way to add sentry into it.
