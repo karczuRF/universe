@@ -1312,6 +1312,7 @@ fn main() {
         ootle_wallet: Arc::new(RwLock::new(OotleWallet::default())),
     };
     let app_state_clone = app_state.clone();
+    #[allow(deprecated, reason = "This is a temporary fix until the new tauri API is released")]
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_process::init())
