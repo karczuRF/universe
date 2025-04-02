@@ -40,10 +40,14 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
+use std::time::Duration;
 use tari_common::configuration::Network;
 use tari_core::transactions::tari_amount::MicroMinotari;
 use tari_crypto::ristretto::RistrettoPublicKey;
 use tari_shutdown::{Shutdown, ShutdownSignal};
+use tari_utilities::epoch_time::EpochTime;
 use tari_utilities::ByteArray;
 use tokio::sync::watch;
 use tokio::time::timeout;
@@ -111,6 +115,7 @@ impl ProcessAdapter for MinotariNodeAdapter {
         config_dir: PathBuf,
         log_dir: PathBuf,
         binary_version_path: PathBuf,
+        is_first_start: bool,
     ) -> Result<(ProcessInstance, Self::StatusMonitor), Error> {
         let inner_shutdown = Shutdown::new();
         let status_shutdown = inner_shutdown.to_signal();
@@ -129,25 +134,47 @@ impl ProcessAdapter for MinotariNodeAdapter {
             info!(target: LOG_TARGET, "Node migration v1: removing peer db at {:?}", peer_db_dir);
 
             if peer_db_dir.exists() {
-                fs::remove_dir_all(peer_db_dir)?;
+                let _unused = fs::remove_dir_all(peer_db_dir).inspect_err(|e| {
+                    warn!(target: LOG_TARGET, "Failed to remove peer db: {:?}", e);
+                });
             }
             info!(target: LOG_TARGET, "Node Migration v1 complete");
             migration_info.version = 1;
         }
         migration_info.save(&migration_file)?;
 
-        let log_config_dir = log_dir
+        if is_first_start {
+            let peer_db_dir = network_dir.join("peer_db");
+            if peer_db_dir.exists() {
+                info!(target: LOG_TARGET, "Removing peer db at {:?}", peer_db_dir);
+                let _unused = fs::remove_dir_all(peer_db_dir).inspect_err(|e| {
+                    warn!(target: LOG_TARGET, "Failed to remove peer db: {:?}", e);
+                });
+            }
+        }
+
+        if is_first_start {
+            let peer_db_dir = network_dir.join("peer_db");
+            if peer_db_dir.exists() {
+                info!(target: LOG_TARGET, "Removing peer db at {:?}", peer_db_dir);
+                let _unused = fs::remove_dir_all(peer_db_dir).inspect_err(|e| {
+                    warn!(target: LOG_TARGET, "Failed to remove peer db: {:?}", e);
+                });
+            }
+        }
+
+        let config_dir = log_dir
             .clone()
             .join("base_node")
             .join("configs")
             .join("log4rs_config_base_node.yml");
         setup_logging(
-            &log_config_dir.clone(),
+            &config_dir.clone(),
             &log_dir,
             include_str!("../log4rs/base_node_sample.yml"),
         )?;
         let working_dir_string = convert_to_string(working_dir)?;
-        let config_dir_string = convert_to_string(log_config_dir)?;
+        let config_dir_string = convert_to_string(config_dir)?;
 
         let mut args: Vec<String> = vec![
             "-b".to_string(),
@@ -173,6 +200,10 @@ impl ProcessAdapter for MinotariNodeAdapter {
             "base_node.grpc_server_allow_methods=\"list_connected_peers, get_blocks\"".to_string(),
             "-p".to_string(),
             "base_node.p2p.allow_test_addresses=true".to_string(),
+            "-p".to_string(),
+            "base_node.p2p.dht.network_discovery.min_desired_peers=12".to_string(),
+            "-p".to_string(),
+            "base_node.p2p.dht.minimize_connections=true".to_string(),
         ];
         if self.use_pruned_mode {
             args.push("-p".to_string());
@@ -200,7 +231,9 @@ impl ProcessAdapter for MinotariNodeAdapter {
                 self.tcp_listener_port
             ));
             args.push("-p".to_string());
-            args.push("base_node.p2p.transport.tor.proxy_bypass_for_outbound_tcp=true".to_string());
+            args.push(
+                "base_node.p2p.transport.tor.proxy_bypass_for_outbound_tcp=false".to_string(),
+            );
             if let Some(mut tor_control_port) = self.tor_control_port {
                 // macos uses libtor, so will be 9051
                 if cfg!(target_os = "macos") {
@@ -257,6 +290,7 @@ impl ProcessAdapter for MinotariNodeAdapter {
                 required_sync_peers: self.required_initial_peers,
                 shutdown_signal: status_shutdown,
                 status_broadcast: self.status_broadcast.clone(),
+                last_block_time: Arc::new(AtomicU64::new(0)),
             },
         ))
     }
@@ -286,6 +320,7 @@ pub(crate) struct BaseNodeStatus {
     pub block_height: u64,
     pub block_time: u64,
     pub is_synced: bool,
+    pub num_connections: u64,
 }
 
 impl Default for BaseNodeStatus {
@@ -297,6 +332,7 @@ impl Default for BaseNodeStatus {
             block_height: 0,
             block_time: 0,
             is_synced: false,
+            num_connections: 0,
         }
     }
 }
@@ -307,16 +343,39 @@ pub struct MinotariNodeStatusMonitor {
     required_sync_peers: u32,
     shutdown_signal: ShutdownSignal,
     status_broadcast: watch::Sender<BaseNodeStatus>,
+    last_block_time: Arc<AtomicU64>,
 }
 
 #[async_trait]
 impl StatusMonitor for MinotariNodeStatusMonitor {
-    async fn check_health(&self) -> HealthStatus {
+    async fn check_health(&self, uptime: Duration) -> HealthStatus {
         let duration = std::time::Duration::from_secs(1);
         match timeout(duration, self.get_network_state()).await {
             Ok(res) => match res {
                 Ok(status) => {
                     let _res = self.status_broadcast.send(status.clone());
+                    if status.num_connections == 0 {
+                        return HealthStatus::Warning;
+                    }
+                    if self
+                        .last_block_time
+                        .load(std::sync::atomic::Ordering::SeqCst)
+                        == status.block_time
+                    {
+                        if uptime.as_secs() > 1200
+                            && EpochTime::now()
+                                .checked_sub(EpochTime::from_secs_since_epoch(status.block_time))
+                                .unwrap_or(EpochTime::from(0))
+                                .as_u64()
+                                > 1200
+                        {
+                            warn!(target: LOG_TARGET, "Base node height has not changed in twenty minutes");
+                            return HealthStatus::Warning;
+                        }
+                    } else {
+                        self.last_block_time
+                            .store(status.block_time, std::sync::atomic::Ordering::SeqCst);
+                    }
                     HealthStatus::Healthy
                 }
                 Err(e) => {
@@ -370,6 +429,7 @@ impl MinotariNodeStatusMonitor {
             block_height: metadata.best_block_height,
             block_time: metadata.timestamp,
             is_synced: res.initial_sync_achieved,
+            num_connections: res.num_connections,
         })
     }
 
