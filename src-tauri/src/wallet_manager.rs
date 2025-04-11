@@ -143,6 +143,8 @@ impl WalletManager {
     pub async fn get_grpc_port(&self) -> u16 {
         let process_watcher = self.watcher.read().await;
         process_watcher.adapter.grpc_port
+    }
+
     pub async fn stop(&self) -> Result<i32, WalletManagerError> {
         let mut process_watcher = self.watcher.write().await;
         process_watcher

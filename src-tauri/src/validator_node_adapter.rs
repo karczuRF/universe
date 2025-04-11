@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use log::{debug, info, warn};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::Duration;
 use tari_common::configuration::Network;
 use tari_shutdown::Shutdown;
 
@@ -43,6 +44,7 @@ impl ProcessAdapter for ValidatorNodeAdapter {
         _config_dir: PathBuf,
         log_dir: PathBuf,
         binary_version_path: PathBuf,
+        _is_first_start: bool,
     ) -> Result<(ProcessInstance, Self::StatusMonitor), Error> {
         let inner_shutdown = Shutdown::new();
 
@@ -166,7 +168,7 @@ impl ValidatorNodeStatusMonitor {
 
 #[async_trait]
 impl StatusMonitor for ValidatorNodeStatusMonitor {
-    async fn check_health(&self) -> HealthStatus {
+    async fn check_health(&self, uptime: Duration) -> HealthStatus {
         if self.status().await.is_ok() {
             HealthStatus::Healthy
         } else {

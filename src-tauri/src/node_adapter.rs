@@ -150,16 +150,6 @@ impl ProcessAdapter for MinotariNodeAdapter {
         //     }
         // }
 
-        if is_first_start {
-            let peer_db_dir = network_dir.join("peer_db");
-            if peer_db_dir.exists() {
-                info!(target: LOG_TARGET, "Removing peer db at {:?}", peer_db_dir);
-                let _unused = fs::remove_dir_all(peer_db_dir).inspect_err(|e| {
-                    warn!(target: LOG_TARGET, "Failed to remove peer db: {:?}", e);
-                });
-            }
-        }
-
         let config_dir = log_dir
             .clone()
             .join("base_node")
@@ -171,7 +161,7 @@ impl ProcessAdapter for MinotariNodeAdapter {
             include_str!("../log4rs/base_node_sample.yml"),
         )?;
         let working_dir_string = convert_to_string(working_dir)?;
-        let config_dir_string = convert_to_string(config_dir)?;
+        let config_dir_string = convert_to_string(config_dir.clone())?;
 
         let mut args: Vec<String> = vec![
             "-b".to_string(),
