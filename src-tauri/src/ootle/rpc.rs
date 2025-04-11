@@ -15,6 +15,7 @@ pub async fn permission_token(jrpc_port: Option<u16>) -> Result<(String, String)
     let req_params = AuthLoginRequest {
         permissions: vec!["Admin".to_string()],
         duration: None,
+        webauthn_finish_auth_request: None,
     };
     info!(target: LOG_TARGET, "🌟 RPC Auth request port: {:?} with params: {:?}", &jrpc_port, &req_params);
     info!(target: LOG_TARGET, "🚀 Auth tokens request");

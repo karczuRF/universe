@@ -65,7 +65,10 @@ pub async fn spawn_wallet_daemon(
         Url::parse("http://18.217.22.26:12006/json_rpc").unwrap(); // TODO get from config
     config.dan_wallet_daemon.json_rpc_address = Some(listening_json_rpc_address);
     let ui_port = PortAllocator::new().assign_port_with_fallback();
-    config.dan_wallet_daemon.ui_connect_address = Some(format!("127.0.0.1:{}", ui_port)); //TODO get from config
+    config.dan_wallet_daemon.web_ui_address = Some(SocketAddr::new(
+        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+        ui_port,
+    )); //TODO get from config
     let signaling_server_port = PortAllocator::new().assign_port_with_fallback();
     let signaling_server_addr = SocketAddr::new(
         IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
@@ -87,7 +90,7 @@ pub async fn spawn_wallet_daemon(
         config.dan_wallet_daemon.indexer_json_rpc_url
     );
 
-    match run_tari_dan_wallet_daemon(config, shutdown_signal, shutdown_signal).await {
+    match run_tari_dan_wallet_daemon(cli, config, shutdown_signal).await {
         Ok(_) => {
             info!(target: LOG_TARGET, "🚀 Running wallet daemon");
             return Ok(());

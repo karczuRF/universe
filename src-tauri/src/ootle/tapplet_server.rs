@@ -3,8 +3,9 @@ use crate::ootle::error::{
     TappletServerError::*,
 };
 
-use axum::Router;
+use axum::{handler::HandlerWithoutStateExt, Router};
 use log::{error, info};
+use reqwest::StatusCode;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
@@ -15,8 +16,12 @@ pub async fn start(tapplet_path: PathBuf) -> Result<(String, CancellationToken),
     serve(using_serve_dir(tapplet_path), 0).await
 }
 
+async fn not_found() -> (StatusCode, &'static str) {
+    (StatusCode::NOT_FOUND, "Resource not found")
+}
+
 pub fn using_serve_dir(tapplet_path: PathBuf) -> Router {
-    let serve_dir = ServeDir::new(tapplet_path);
+    let serve_dir = ServeDir::new(tapplet_path).not_found_service(not_found.into_service());
     Router::new().nest_service("/", serve_dir)
 }
 
