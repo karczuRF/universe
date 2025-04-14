@@ -3,6 +3,7 @@ import { useTappletSignerStore } from '@app/store/useTappletSignerStore';
 import { useUIStore } from '@app/store/useUIStore';
 import { TappletSigner } from '@app/types/ootle/TappletSigner';
 import { useCallback, useEffect, useRef } from 'react';
+import { setDialogToShow } from '@app/store';
 
 interface TappletProps {
     source: string;
@@ -13,7 +14,6 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
     const tappletRef = useRef<HTMLIFrameElement | null>(null);
     const runTransaction = useTappletSignerStore((s) => s.runTransaction);
     const addTransaction = useTappletTransactionsStore((s) => s.addTransaction);
-    const setDialogToShow = useUIStore((s) => s.setDialogToShow);
 
     function sendWindowSize() {
         if (tappletRef.current) {

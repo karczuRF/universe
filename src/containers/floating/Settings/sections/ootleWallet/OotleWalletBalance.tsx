@@ -65,7 +65,6 @@ const OotleWalletBalance = () => {
                 offset: null,
                 limit: 10,
             });
-            console.log('PROVIDER LIST SUBSTATE', ls);
             const ls1 = await tappSigner?.listSubstates({
                 filter_by_template: null,
                 filter_by_type: null,
@@ -76,7 +75,7 @@ const OotleWalletBalance = () => {
         } catch (error) {
             console.error(error);
         }
-    }, [provider]);
+    }, [provider, tappSigner]);
 
     const onClickTemplates = useCallback(async () => {
         try {

@@ -10,11 +10,11 @@ import { ButtonsWrapper } from './TappletTransactionDialog.styles';
 import { useTappletTransactionsStore } from '@app/store/useTappletTransactionsStore';
 import { BalanceUpdate } from '@app/types/ootle/txSimulation';
 import { TransactionStatus } from '@tari-project/tarijs-types';
+import { setDialogToShow } from '@app/store';
 
 const TappletTransactionDialog = memo(function AutoUpdateDialog() {
     const { t } = useTranslation('setup-view', { useSuspense: false }); //TODO add transaltion
     const open = useUIStore((s) => s.dialogToShow === 'txSimulation');
-    const setDialogToShow = useUIStore((s) => s.setDialogToShow);
     const getPendingTransaction = useTappletTransactionsStore((s) => s.getPendingTransaction);
     const tx = getPendingTransaction();
     const [estimatedFee, setEstimatedFee] = useState<number>();
@@ -28,7 +28,7 @@ const TappletTransactionDialog = memo(function AutoUpdateDialog() {
         tx.cancel();
         setEstimatedFee(undefined);
         setDialogToShow(null);
-    }, [setDialogToShow, tx]);
+    }, [tx]);
 
     const handleSubmit = useCallback(async () => {
         console.warn('SUBMIT run TX', tx);

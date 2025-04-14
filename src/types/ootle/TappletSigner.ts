@@ -5,7 +5,6 @@ import {
     TransactionSubmitRequest,
     AccountsListResponse,
     WalletDaemonClient,
-    SubstateType,
     AccountSetDefaultResponse,
 } from '@tari-project/wallet_jrpc_client';
 import { IPCRpcTransport } from './ipc_transport';

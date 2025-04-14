@@ -55,7 +55,7 @@ export default function TappletsInstalled() {
                 console.error('Error closing application| handleClose in CriticalProblemDialog: ', e);
             }
         },
-        [isSettingsOpen, setActiveTappById, setIsSettingsOpen]
+        [isSettingsOpen, setActiveTappById]
     );
 
     useEffect(() => {

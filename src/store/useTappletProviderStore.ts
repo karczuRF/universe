@@ -1,7 +1,7 @@
 import { create } from './create.ts';
-import { useAppStateStore } from './appStateStore.ts';
 import { IndexerProvider, IndexerProviderParameters } from '@tari-project/indexer-provider';
 import { TariPermissions } from '@tari-project/tari-permissions';
+import { setError } from './index.ts';
 
 interface State {
     isInitialized: boolean;
@@ -39,9 +39,8 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
 
             set({ provider });
         } catch (error) {
-            const appStateStore = useAppStateStore.getState();
             console.error('Error setting tapplet provider: ', error);
-            appStateStore.setError(`Error setting tapplet provider: ${error}`);
+            setError(`Error setting tapplet provider: ${error}`);
         }
     },
 }));
