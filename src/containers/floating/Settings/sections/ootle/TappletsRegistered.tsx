@@ -31,7 +31,6 @@ export default function TappletsRegistered() {
 
     useEffect(() => {
         fetchRegisteredTapplets();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (

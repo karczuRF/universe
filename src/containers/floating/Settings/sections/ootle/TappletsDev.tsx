@@ -15,15 +15,15 @@ import { Controller, useForm } from 'react-hook-form';
 import { IoCheckmarkOutline, IoCloseOutline } from 'react-icons/io5';
 import { useAppStateStore } from '@app/store/appStateStore.ts';
 import { Count, StyledForm, StyledInput, StyledStack } from './OotleSettings.styles.ts';
+import { setError, setIsSettingsOpen } from '@app/store/index.ts';
 
 const endpointRegex = /^(https?:\/\/)?(localhost|127\.0\.0\.1):\d{1,6}?$/;
 
 export default function TappletsDev() {
     const { t } = useTranslation('ootle', { useSuspense: false });
     const initialDevTappEndpoint = '';
-    const setError = useAppStateStore((s) => s.setError);
     const { devTapplets, setActiveTappById, addDevTapp, deleteDevTapp, getDevTapps } = useTappletsStore();
-    const { isSettingsOpen, setIsSettingsOpen } = useAppStateStore();
+    const { isSettingsOpen } = useAppStateStore();
     const devTappletsCount = devTapplets?.length || 0;
 
     const {
@@ -60,7 +60,6 @@ export default function TappletsDev() {
 
     useEffect(() => {
         getDevTapps();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleLaunch = useCallback(
@@ -72,7 +71,7 @@ export default function TappletsDev() {
                 setError(`Error while launching dev tapplet: ${e}`);
             }
         },
-        [isSettingsOpen, setActiveTappById, setError, setIsSettingsOpen]
+        [isSettingsOpen, setActiveTappById]
     );
 
     return (

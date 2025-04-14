@@ -11,10 +11,11 @@ import tariLogo from '@app/assets/tari.svg';
 import { useTappletsStore } from '@app/store/useTappletsStore.ts';
 import { useAppStateStore } from '@app/store/appStateStore.ts';
 import { Count } from './OotleSettings.styles.ts';
+import { setIsSettingsOpen } from '@app/store/index.ts';
 
 export default function TappletsInstalled() {
     const { t } = useTranslation('ootle', { useSuspense: false });
-    const { isSettingsOpen, setIsSettingsOpen } = useAppStateStore();
+    const { isSettingsOpen } = useAppStateStore();
     const setActiveTappById = useTappletsStore((s) => s.setActiveTappById);
     const deleteInstalledTapp = useTappletsStore((s) => s.deleteInstalledTapp);
     const updateInstalledTapp = useTappletsStore((s) => s.updateInstalledTapp);
@@ -59,7 +60,6 @@ export default function TappletsInstalled() {
 
     useEffect(() => {
         getInstalledTapps();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (

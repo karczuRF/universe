@@ -74,7 +74,6 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
             window.removeEventListener('resize', sendWindowSize);
             window.removeEventListener('message', handleMessage);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return <iframe src={source} width="100%" height="100%" ref={tappletRef} onLoad={sendWindowSize}></iframe>;
