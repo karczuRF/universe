@@ -115,7 +115,8 @@ urlencoding = "2.1.3"
 reqwest-middleware = "0.4.0"
 reqwest-retry = "0.7.0"
 cfspeedtest = "1.3.1"
-tower-http = { version = "0.4", default-features = false, features = ["fs"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.2", default-features = false, features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
 planif = "1.0.0"
