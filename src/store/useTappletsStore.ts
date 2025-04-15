@@ -8,8 +8,8 @@ import {
     RegisteredTappletWithAssets,
     TappletConfig,
 } from '@app/types/ootle/tapplet.ts';
-import { useAppStateStore } from './appStateStore.ts';
 import { useTappletSignerStore } from './useTappletSignerStore.ts';
+import { setError } from './index.ts';
 
 export const TAPPLET_CONFIG_FILE = 'tapplet.config.json'; //TODO
 
@@ -67,9 +67,8 @@ export const useTappletsStore = create<TappletsStoreState>()((set, get) => ({
 
             set({ isFetching: false, isInitialized: true, registeredTapplets: tappletsWithAssets });
         } catch (error) {
-            const appStateStore = useAppStateStore.getState();
             console.error('Error fetching registered tapplets: ', error);
-            appStateStore.setError(`'Error fetching registered tapplets: ${error}`);
+            setError(`'Error fetching registered tapplets: ${error}`);
         }
     },
     getInstalledTapps: async () => {
@@ -80,9 +79,8 @@ export const useTappletsStore = create<TappletsStoreState>()((set, get) => ({
             console.info('[STORE] get installed tapp success', installedTapplets);
             set({ installedTapplets });
         } catch (error) {
-            const appStateStore = useAppStateStore.getState();
             console.error('Error fetching registered tapplets: ', error);
-            appStateStore.setError(`'Error fetching registered tapplets: ${error}`);
+            setError(`'Error fetching registered tapplets: ${error}`);
         }
     },
     installRegisteredTapp: async (tappletId: string) => {
@@ -107,9 +105,8 @@ export const useTappletsStore = create<TappletsStoreState>()((set, get) => ({
                 installedTapplets: [...state.installedTapplets, tapp],
             }));
         } catch (error) {
-            const appStateStore = useAppStateStore.getState();
             console.error('Error installing tapplet: ', error);
-            appStateStore.setError(`'Error installing tapplet: ${error}`);
+            setError(`'Error installing tapplet: ${error}`);
         }
     },
     setActiveTapp: async (tapplet) => {

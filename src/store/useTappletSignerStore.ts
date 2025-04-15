@@ -1,10 +1,10 @@
 import { create } from './create.ts';
 import { ActiveTapplet } from '@app/types/ootle/tapplet.ts';
-import { useAppStateStore } from './appStateStore.ts';
 import { TappletSigner, TappletSignerParams } from '@app/types/ootle/TappletSigner.ts';
 import { TransactionEvent } from '@app/types/ootle/transaction.ts';
 
 import { createPermissionFromType, TariPermissions } from '@tari-project/tari-permissions';
+import { setError } from './index.ts';
 
 interface State {
     isInitialized: boolean;
@@ -40,9 +40,8 @@ export const useTappletSignerStore = create<TappletSignerStoreState>()((set, get
 
             set({ isInitialized: true, tappletSigner: provider });
         } catch (error) {
-            const appStateStore = useAppStateStore.getState();
             console.error('Error setting tapplet provider: ', error);
-            appStateStore.setError(`Error setting tapplet provider: ${error}`);
+            setError(`Error setting tapplet provider: ${error}`);
         }
     },
     setTappletSigner: async (id: string, launchedTapplet: ActiveTapplet) => {
@@ -66,9 +65,8 @@ export const useTappletSignerStore = create<TappletSignerStoreState>()((set, get
 
             set({ isInitialized: true, tappletSigner: provider });
         } catch (error) {
-            const appStateStore = useAppStateStore.getState();
             console.error('Error setting tapplet provider: ', error);
-            appStateStore.setError(`Error setting tapplet provider: ${error}`);
+            setError(`Error setting tapplet provider: ${error}`);
         }
     },
     runTransaction: async (event: MessageEvent<TransactionEvent>) => {
@@ -81,9 +79,8 @@ export const useTappletSignerStore = create<TappletSignerStoreState>()((set, get
                 event.source.postMessage({ id, result, type: 'signer-call' }, { targetOrigin: event.origin });
             }
         } catch (error) {
-            const appStateStore = useAppStateStore.getState();
             console.error(`Error running method "${String(methodName)}": ${error}`);
-            appStateStore.setError(`Error running method "${String(methodName)}": ${error}`);
+            setError(`Error running method "${String(methodName)}": ${error}`);
         }
     },
 }));

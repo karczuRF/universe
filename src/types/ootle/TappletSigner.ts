@@ -18,7 +18,6 @@ import {
     SubmitTransactionResponse,
     Substate,
     TemplateDefinition,
-    TransactionResult,
     VaultBalances,
 } from '@tari-project/tarijs-types';
 import {

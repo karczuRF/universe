@@ -271,3 +271,9 @@ export const setVisualMode = (enabled: boolean) => {
         useAppConfigStore.setState({ visual_mode: !enabled });
     });
 };
+export const setOotleEnabled = async (ootleEnabled: boolean) => {
+    useAppConfigStore.setState({ ootle_enabled: ootleEnabled });
+};
+export const setOotleLocalNodeEnabled = async (ootleLocalNodeEnabled: boolean) => {
+    useAppConfigStore.setState({ ootle_local_node: ootleLocalNodeEnabled });
+};

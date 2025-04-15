@@ -1,6 +1,5 @@
 import { useTappletTransactionsStore } from '@app/store/useTappletTransactionsStore';
 import { useTappletSignerStore } from '@app/store/useTappletSignerStore';
-import { useUIStore } from '@app/store/useUIStore';
 import { TappletSigner } from '@app/types/ootle/TappletSigner';
 import { useCallback, useEffect, useRef } from 'react';
 import { setDialogToShow } from '@app/store';
@@ -55,16 +54,6 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
         },
         [runTransaction]
     );
-
-    // const runTappletTxSimulation = useCallback(
-    //     async (event: MessageEvent) => {
-    //         console.warn('SIIIIMULATION run TX');
-    //         const { balanceUpdates, txSimulation } = await runSimulation(event.data.id);
-    //         console.warn('SIIIIMULATION RES TX', txSimulation);
-    //         console.warn('SIIIIMULATION RES BALANCES', balanceUpdates);
-    //     },
-    //     [runSimulation]
-    // );
 
     useEffect(() => {
         window.addEventListener('resize', sendWindowSize);

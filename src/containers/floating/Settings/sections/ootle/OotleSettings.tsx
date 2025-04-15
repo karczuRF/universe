@@ -13,22 +13,20 @@ import { useTranslation } from 'react-i18next';
 import { ToggleSwitch } from '@app/components/elements/ToggleSwitch';
 import { useCallback } from 'react';
 import { TappletsOverview } from './TappletsOverview';
+import { setOotleEnabled, setOotleLocalNodeEnabled } from '@app/store';
 
 export const OotleSettings = () => {
     const { t } = useTranslation(['settings', 'ootle'], { useSuspense: false });
     const ootleMode = useAppConfigStore((s) => s.ootle_enabled);
     const ootleLocalNode = useAppConfigStore((s) => s.ootle_local_node);
 
-    const setOotleEnabled = useAppConfigStore((s) => s.setOotleEnabled);
-    const setOotleLocalNode = useAppConfigStore((s) => s.setOotleLocalNode);
-
     const handleOotleSwitch = useCallback(() => {
         setOotleEnabled(!ootleMode);
-    }, [ootleMode, setOotleEnabled]);
+    }, [ootleMode]);
 
     const handleIndexerSwitch = useCallback(() => {
-        setOotleLocalNode(!ootleLocalNode);
-    }, [ootleLocalNode, setOotleLocalNode]);
+        setOotleLocalNodeEnabled(!ootleLocalNode);
+    }, [ootleLocalNode]);
 
     return (
         <>

@@ -1,5 +1,4 @@
 import { create } from './create.ts';
-import { useAppStateStore } from './appStateStore.ts';
 import { TappletSigner } from '@app/types/ootle/TappletSigner.ts';
 import { TransactionEvent, TappletTransaction, txCheck } from '@app/types/ootle/transaction.ts';
 import { useOotleWalletStore } from './useOotleWalletStore.ts';
@@ -8,6 +7,7 @@ import { AccountsGetBalancesResponse } from '@tari-project/typescript-bindings';
 import { useTappletSignerStore } from './useTappletSignerStore.ts';
 import { FinalizeResult, TransactionStatus, UpSubstates } from '@tari-project/tarijs-types';
 import { SubmitTransactionRequest } from '@tari-project/tarijs-types';
+import { setError } from './index.ts';
 
 interface State {
     pendingTxId?: number;
@@ -32,7 +32,6 @@ export const useTappletTransactionsStore = create<TappletTransactionsStoreState>
 
     addTransaction: async (event: MessageEvent<TransactionEvent>) => {
         const { methodName, args, id } = event.data;
-        const appStateStore = useAppStateStore.getState();
         const signer = useTappletSignerStore.getState().tappletSigner;
 
         const updateStatus = (status: TransactionStatus) => {
@@ -63,7 +62,6 @@ export const useTappletTransactionsStore = create<TappletTransactionsStoreState>
         const runSimulation = async (): Promise<TxSimulationResult> => {
             updateStatus(TransactionStatus.DryRun);
             const account = useOotleWalletStore.getState().ootleAccount;
-            const appStateStore = useAppStateStore.getState();
 
             try {
                 if (methodName !== 'submitTransaction') {
@@ -135,7 +133,7 @@ export const useTappletTransactionsStore = create<TappletTransactionsStoreState>
                 return { balanceUpdates, txSimulation, estimatedFee: txResult.fee_receipt.total_fees_paid };
             } catch (error) {
                 console.error(`Error running method "${String(methodName)}": ${error}`);
-                appStateStore.setError(`Error running method "${String(methodName)}": ${error}`);
+                setError(`Error running method "${String(methodName)}": ${error}`);
                 return createInvalidTxSimulationResult(`Error running method "${String(methodName)}": ${error}`);
             }
         };
@@ -145,7 +143,7 @@ export const useTappletTransactionsStore = create<TappletTransactionsStoreState>
             try {
                 console.info(`🌎️🌎️🌎️ [TU store][SUBMIT] ID`, id);
                 if (!signer) {
-                    appStateStore.setError(`Signer undefined`);
+                    setError(`Signer undefined`);
                     return null;
                 }
                 console.info(`🌎️ [TU store][run tx] Running method "${String(methodName)}"`);
@@ -165,7 +163,7 @@ export const useTappletTransactionsStore = create<TappletTransactionsStoreState>
                 return txResult;
             } catch (error) {
                 console.error(`Error running method "${String(methodName)}": ${error}`);
-                appStateStore.setError(`Error running method "${String(methodName)}": ${error}`);
+                setError(`Error running method "${String(methodName)}": ${error}`);
                 return null;
             }
         };
@@ -212,9 +210,8 @@ export const useTappletTransactionsStore = create<TappletTransactionsStoreState>
             }));
             console.info(`🌎️ [TU store][init tx] success`, newTransaction);
         } catch (error) {
-            // const appStateStore = useAppStateStore.getState();
             console.error('Error setting new transaction: ', error);
-            appStateStore.setError(`Error setting new transaction: ${error}`);
+            setError(`Error setting new transaction: ${error}`);
         }
     },
     getTransactionById: (id) => {

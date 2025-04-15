@@ -21,6 +21,8 @@ export {
     setMode,
     setMoneroAddress,
     setMonerodConfig,
+    setOotleEnabled,
+    setOotleLocalNodeEnabled,
     setP2poolEnabled,
     setPreRelease,
     setShouldAlwaysUseSystemLanguage,
