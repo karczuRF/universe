@@ -1,17 +1,15 @@
 use std::{
     collections::HashMap,
-    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
 use db_connection::try_get_tokens;
 use diesel::SqliteConnection;
-use log::{error, info};
+use log::info;
 use tauri::Manager;
 use tokio_util::sync::CancellationToken;
-use wallet_daemon::spawn_wallet_daemon;
 
-use crate::{commands::get_ootle_wallet_jrpc_port, consts::WALLET_DAEMON_CONFIG_FILE};
+use crate::commands::get_ootle_wallet_jrpc_port;
 
 pub mod db_connection;
 pub mod error;
@@ -52,7 +50,8 @@ pub async fn setup_tokens(app: tauri::AppHandle) -> Result<(), Box<dyn std::erro
     let jrpc_port = get_ootle_wallet_jrpc_port(app.state()).unwrap_or_default();
     let tokens = app.state::<Tokens>();
     let (permission_token, auth_token) = try_get_tokens(Some(jrpc_port)).await;
-    info!(target: LOG_TARGET, "🚀 Tokens setup successfully");
+    info!(target: LOG_TARGET, "🚀 Tokens setup done with results:");
+    info!(target: LOG_TARGET, "🚀 jrpc port {}", jrpc_port);
     info!(target: LOG_TARGET, "🚀 permission {}", permission_token);
     info!(target: LOG_TARGET, "🚀 auth {}", auth_token);
     tokens

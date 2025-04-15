@@ -10,7 +10,7 @@ use crate::{
     consts::WALLET_DAEMON_CONFIG_FILE, port_allocator::PortAllocator,
     utils::logging_utils::setup_logging,
 };
-use log::{info, warn};
+use log::{error, info};
 use tari_common_dan2::configuration::Network;
 use tari_dan_app_utilities::configuration::load_configuration;
 use tari_dan_wallet_daemon::{
@@ -53,14 +53,18 @@ pub async fn spawn_wallet_daemon(
     cli.common.base_path = data_dir.to_str().unwrap().to_owned();
     cli.common.config = wallet_daemon_config_file.clone();
     cli.common.log_config = Some(log_config_file.clone());
+    let tmp_conf_path = wallet_daemon_config_file.clone();
 
-    let cfg = load_configuration(wallet_daemon_config_file, true, &cli, None).unwrap();
+    let cfg = load_configuration(wallet_daemon_config_file, true, &cli, Some(network)).unwrap();
 
     let mut config = ApplicationConfig::load_from(&cfg).unwrap();
-    info!(target: LOG_TARGET, "🌟 WALLET DAEMON NETWORK {:?} LOADED CONFIG {:?}", &network, &config);
-    config.dan_wallet_daemon = WalletDaemonConfig::default();
+    info!(target: LOG_TARGET, "🌟 WALLET DAEMON NETWORK {:?} LOADED FROM FILE {:?} CONFIG {:?}", &network, tmp_conf_path, &config);
+
+    // contractnet wallet:
+    // http://18.217.22.26:12009/json_rpc
     let listening_json_rpc_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port);
 
+    config.dan_wallet_daemon.network = network;
     config.dan_wallet_daemon.indexer_json_rpc_url =
         Url::parse("http://18.217.22.26:12006/json_rpc").unwrap(); // TODO get from config
     config.dan_wallet_daemon.json_rpc_address = Some(listening_json_rpc_address);
@@ -96,7 +100,7 @@ pub async fn spawn_wallet_daemon(
             return Ok(());
         }
         Err(e) => {
-            warn!(target: LOG_TARGET, "Error running wallet daemon: {}", e);
+            error!(target: LOG_TARGET, "Error running wallet daemon: {}", e);
             return Err(e);
         }
     }

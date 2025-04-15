@@ -13,11 +13,11 @@ pub async fn try_get_tokens(jrpc_port: Option<u16>) -> (String, String) {
     loop {
         match permission_token(jrpc_port).await {
             Ok(tokens) => {
-                info!(target: LOG_TARGET, "✅ Wallet Daemon permission token found");
+                info!(target: LOG_TARGET, "✅ Try {:?}/{:?}: Wallet Daemon permission token found", retries, close_max_retries);
                 return tokens;
             }
             Err(e) => {
-                warn!(target: LOG_TARGET, "❌ Wallet Daemon permission token error: {:?}", e);
+                warn!(target: LOG_TARGET, "❌ Try {:?}/{:?}: Wallet Daemon permission token error: {:?}", retries, close_max_retries, e);
                 retries += 1;
                 if retries >= close_max_retries {
                     error!(target: LOG_TARGET, "Failed to fetch permission token after {:?} retries: {:?}", close_max_retries,e);

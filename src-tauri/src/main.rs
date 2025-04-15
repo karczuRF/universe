@@ -877,7 +877,10 @@ async fn setup_inner(
     }
 
     //TODO RUN OOTLE
-    if state.config.read().await.ootle_enabled() {
+    let is_ootle = state.config.read().await.ootle_enabled();
+    info!(target: LOG_TARGET, "🚀 Ootle? {:?}", is_ootle);
+    if is_ootle {
+        info!(target: LOG_TARGET, "🚀 Ootle enabled - start Ootle");
         let _unused = telemetry_service
             .send(
                 "starting-ootle".to_string(),
@@ -906,8 +909,8 @@ async fn setup_inner(
             permission: std::sync::Mutex::new("".to_string()),
         });
         app.manage(ShutdownTokens::default());
-        // let jrpc_port = PortAllocator::new().assign_port_with_fallback();
-        let jrpc_port = 9000;
+        let jrpc_port = PortAllocator::new().assign_port_with_fallback();
+        // let jrpc_port = 9000;
         app.manage(OotleWallet { jrpc_port });
 
         info!(target: LOG_TARGET, "🚀🚀🚀 RUN OOTLE THREAD {:?}", jrpc_port);
@@ -1002,6 +1005,7 @@ async fn setup_inner(
         }
     }
 
+    info!(target: LOG_TARGET, "🚀 Ootle section done {:?}", is_ootle);
     let _unused = telemetry_service
         .send(
             "starting-mmproxy".to_string(),
