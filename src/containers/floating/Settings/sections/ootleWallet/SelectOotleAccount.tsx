@@ -1,12 +1,22 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
-import { DialogContent, FormControl, MenuItem, Select, SelectChangeEvent } from '@mui/material';
+import { DialogContent, FormControl, MenuItem, SelectChangeEvent } from '@mui/material';
 import { useOotleWalletStore } from '@app/store/useOotleWalletStore';
 import { AccountInfo } from '@tari-project/typescript-bindings';
 import { OotleAccount } from '@app/types/ootle';
 import { SquaredButton } from '@app/components/elements/buttons/SquaredButton';
 import { Input } from '@app/components/elements/inputs/Input';
-import { SettingsGroup } from '../../components/SettingsGroup.styles';
+import { SettingsGroup, SettingsGroupContent } from '../../components/SettingsGroup.styles';
+import { Button } from '@app/components/elements/buttons/Button';
+import styled from 'styled-components';
+import { Select } from '@app/components/elements/inputs/Select';
+import * as m from 'motion/react-m';
+
+const Wrapper = styled(m.div)`
+    width: 100%;
+    display: flex;
+    position: relative;
+`;
 
 interface SelectAccountProps {
     accountsList: AccountInfo[];
@@ -19,15 +29,22 @@ function SelectOotleAccount({ accountsList, currentAccount }: SelectAccountProps
     const currentAccountName = currentAccount?.account_name ?? '';
     const [newAccountName, setNewAccountName] = useState('');
 
+    const accountOptions = useMemo(() => {
+        return accountsList.map((acc) => ({
+            label: acc.account.name ?? '',
+            value: acc.account.name ?? '',
+        }));
+    }, [accountsList]);
+
     const handleCreateNewAccount = useCallback(async () => {
         console.info('CREATE ACCOUNT', newAccountName);
         await createAccount(newAccountName);
     }, [createAccount, newAccountName]);
 
-    const handleChange = useCallback(
-        async (event: SelectChangeEvent) => {
-            console.info('CHANGE ACCOUNT TO: ', event.target.value);
-            return await setDefaultAccount(event.target.value);
+    const handleAccountChange = useCallback(
+        async (value: string) => {
+            console.info('CHANGE ACCOUNT TO: ', value);
+            await setDefaultAccount(value);
         },
         [setDefaultAccount]
     );
@@ -38,50 +55,30 @@ function SelectOotleAccount({ accountsList, currentAccount }: SelectAccountProps
 
     //TODO refactor select component
     return (
-        <Box sx={{ minWidth: 250 }}>
-            <DialogContent className="dialog-content">
-                <FormControl fullWidth>
+        <Box>
+            <SettingsGroup>
+                <Input
+                    name="new-account-name"
+                    type="text"
+                    placeholder="New account name"
+                    value={newAccountName}
+                    onChange={onAddAccountChange}
+                />
+                <Button size="medium" onClick={handleCreateNewAccount} disabled={!newAccountName}>
+                    {'Create account'}
+                </Button>
+            </SettingsGroup>
+            <SettingsGroupContent>
+                <Wrapper>
                     <Select
-                        labelId="account-select-label"
-                        id="account-select"
-                        value={
-                            accountsList.some((account: AccountInfo) => account.account.name == currentAccountName)
-                                ? currentAccountName
-                                : 'Select account'
-                        }
-                        label="Account"
-                        onChange={handleChange}
-                    >
-                        {accountsList.map((account: AccountInfo) => {
-                            if (account.account.name === null) {
-                                return null;
-                            }
-                            return (
-                                <MenuItem key={account.public_key} value={account.account.name}>
-                                    {account.account.name}
-                                </MenuItem>
-                            );
-                        })}
-                    </Select>
-                </FormControl>
-                <SettingsGroup>
-                    <Input
-                        name="new-account-name"
-                        type="text"
-                        placeholder="New account name"
-                        value={newAccountName}
-                        onChange={onAddAccountChange}
+                        options={accountOptions}
+                        onChange={handleAccountChange}
+                        selectedValue={currentAccountName}
+                        variant="bordered"
+                        forceHeight={36}
                     />
-                    <SquaredButton
-                        onClick={handleCreateNewAccount}
-                        color="tariPurple"
-                        size="medium"
-                        style={{ width: '50%', alignContent: 'center', marginBottom: 10 }}
-                    >
-                        {'Create account'}
-                    </SquaredButton>
-                </SettingsGroup>
-            </DialogContent>
+                </Wrapper>
+            </SettingsGroupContent>
         </Box>
     );
 }

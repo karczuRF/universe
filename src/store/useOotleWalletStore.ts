@@ -10,7 +10,7 @@ interface State {
 
 interface Actions {
     createAccount: (name: string) => Promise<void>;
-    setDefaultAccount: (name: string) => Promise<void>;
+    setDefaultAccount: (name?: string) => Promise<void>;
     getOotleAccountInfo: () => Promise<void>;
     getOotleAccountsList: () => Promise<void>;
 }
@@ -44,13 +44,13 @@ export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
             console.error('Could not create the new Ootle account: ', error);
         }
     },
-    setDefaultAccount: async (name: string) => {
+    setDefaultAccount: async (name?: string) => {
         const signer = useTappletSignerStore.getState().tappletSigner;
         try {
             if (!signer) {
                 return;
             }
-            await signer.setDefaultAccount(name);
+            if (name) await signer.setDefaultAccount(name);
             // if tapplet uses TU signer it gets default account
             // this is to make sure tapplet uses the account selected by the user
             const account = await signer.getAccount();
@@ -70,10 +70,6 @@ export const useOotleWalletStore = create<OotleWalletStoreState>()((set) => ({
             // if tapplet uses TU signer it gets default account
             // this is to make sure tapplet uses the account selected by the user
             const account = await signer.getAccount();
-            const temp = await signer.getTemplateDefinition(
-                '7e4d81e4445965e25c80c26ff13605e06ad5eeab844ba4a695634ed3fbdd7252'
-            );
-            console.warn('-------------------> TEMP DEF', temp);
             set({
                 ootleAccount: account,
             });

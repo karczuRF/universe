@@ -3,6 +3,7 @@ import { SquaredButton } from '@app/components/elements/buttons/SquaredButton';
 import { Typography } from '@app/components/elements/Typography';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import { SettingsGroup, SettingsGroupContent, SettingsGroupWrapper } from '../../components/SettingsGroup.styles';
 
 export async function uploadFile(url: string, formData: FormData) {
     const response = await fetch(`${url}/upload_template`, {
@@ -39,26 +40,33 @@ function TemplateFileUploader() {
     }, []);
 
     return (
-        <div className="template">
-            <Typography>{'Upload wasm file'}</Typography>
-            <Typography>{`Path: ${selectedFilePath}`}</Typography>
-            <SquaredButton
-                onClick={handleFileSelect}
-                color="tariPurple"
-                size="medium"
-                style={{ width: '25%', alignContent: 'center', marginBottom: 10 }}
-            >
-                {'Select wasm file'}
-            </SquaredButton>
-            <SquaredButton
-                onClick={handleFileUpload}
-                color="tariPurple"
-                size="medium"
-                style={{ width: '25%', alignContent: 'center', marginBottom: 10 }}
-            >
-                {'Upload wasm file'}
-            </SquaredButton>
-        </div>
+        <SettingsGroupWrapper>
+            <SettingsGroup>
+                <SettingsGroupContent>
+                    <Typography variant="h3">{'Upload wasm file'}</Typography>
+                    <Typography variant="h6">{`Path: ${selectedFilePath}`}</Typography>
+                    {!selectedFilePath ? (
+                        <SquaredButton
+                            onClick={handleFileSelect}
+                            color="tariPurple"
+                            size="medium"
+                            style={{ width: '25%', alignContent: 'center', marginBottom: 10 }}
+                        >
+                            {'Select wasm file'}
+                        </SquaredButton>
+                    ) : (
+                        <SquaredButton
+                            onClick={handleFileUpload}
+                            color="tariPurple"
+                            size="medium"
+                            style={{ width: '25%', alignContent: 'center', marginBottom: 10 }}
+                        >
+                            {'Upload wasm file'}
+                        </SquaredButton>
+                    )}
+                </SettingsGroupContent>
+            </SettingsGroup>
+        </SettingsGroupWrapper>
     );
 }
 

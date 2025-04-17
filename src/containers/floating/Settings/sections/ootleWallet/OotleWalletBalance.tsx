@@ -12,14 +12,12 @@ import { CardComponent } from '../../components/Card.component';
 import SelectAccount from './SelectOotleAccount';
 import { useOotleWalletStore } from '@app/store/useOotleWalletStore';
 import { shortenSubstateAddress } from '@app/utils';
-import { Button } from '@app/components/elements/buttons/Button';
 import { useTappletProviderStore } from '@app/store/useTappletProviderStore';
 
 const OotleWalletBalance = () => {
     const { t } = useTranslation(['settings', 'ootle'], { useSuspense: false });
 
     const tappSigner = useTappletSignerStore((s) => s.tappletSigner);
-    const provider = useTappletProviderStore((s) => s.provider);
     const isTappProviderInitialized = useTappletSignerStore((s) => s.isInitialized);
     const initTappletSigner = useTappletSignerStore((s) => s.initTappletSigner);
     const initTappletProvider = useTappletProviderStore((s) => s.initTappletProvider);
@@ -27,6 +25,7 @@ const OotleWalletBalance = () => {
     const ootleAccountsList = useOotleWalletStore((s) => s.ootleAccountsList);
     const getOotleAccountInfo = useOotleWalletStore((s) => s.getOotleAccountInfo);
     const getOotleAccountsList = useOotleWalletStore((s) => s.getOotleAccountsList);
+    const setDefaultAccount = useOotleWalletStore((s) => s.setDefaultAccount);
 
     // TODO fetch all data from backend
     const refreshProvider = useCallback(async () => {
@@ -44,10 +43,11 @@ const OotleWalletBalance = () => {
     const refreshAccount = useCallback(async () => {
         try {
             await getOotleAccountInfo();
+            if (!ootleAccount) setDefaultAccount();
         } catch (error) {
             console.error(error);
         }
-    }, [getOotleAccountInfo]);
+    }, [getOotleAccountInfo, ootleAccount, setDefaultAccount]);
 
     const refreshAccountsList = useCallback(async () => {
         try {
@@ -57,39 +57,10 @@ const OotleWalletBalance = () => {
         }
     }, [getOotleAccountsList]);
 
-    const onClick = useCallback(async () => {
-        try {
-            const ls = await provider?.listSubstates({
-                filter_by_template: null,
-                filter_by_type: null,
-                offset: null,
-                limit: 10,
-            });
-            const ls1 = await tappSigner?.listSubstates({
-                filter_by_template: null,
-                filter_by_type: null,
-                offset: null,
-                limit: 10,
-            });
-            console.log('signer LIST SUBSTATE', ls1);
-        } catch (error) {
-            console.error(error);
-        }
-    }, [provider, tappSigner]);
-
-    const onClickTemplates = useCallback(async () => {
-        try {
-            const t = await provider?.listTemplates();
-            console.log('PROVIDER LIST TEMPLATES', t);
-        } catch (error) {
-            console.error(error);
-        }
-    }, [provider]);
-
     useEffect(() => {
         refreshProvider();
-        refreshAccount();
         refreshAccountsList();
+        refreshAccount();
     }, []);
 
     return (
@@ -103,7 +74,7 @@ const OotleWalletBalance = () => {
                                 {isTappProviderInitialized ? 'Provider initialized' : 'Provider not initialized'}
                             </Typography>
                         </Stack>
-                        <Typography>{t('Tari Ootle Account')}</Typography>
+                        <Typography variant="h3">{t('Tari Ootle Account')}</Typography>
                         <Typography variant="h6">{ootleAccount?.account_name}</Typography>
                         <Typography variant="h6">{ootleAccount?.address}</Typography>
                     </SettingsGroupContent>
@@ -132,11 +103,8 @@ const OotleWalletBalance = () => {
                         </Stack>
                     </SettingsGroupContent>
                 </SettingsGroup>
-                <Button onClick={onClick}>{'PROVIDER LIST SUBSTATE'}</Button>
-                <Button onClick={onClickTemplates}>{'PROVIDER LIST TEMPLATES'}</Button>
-                <SettingsGroup>
-                    <SelectAccount accountsList={ootleAccountsList} currentAccount={ootleAccount} />
-                </SettingsGroup>
+
+                <SelectAccount accountsList={ootleAccountsList} currentAccount={ootleAccount} />
             </SettingsGroupWrapper>
         </>
     );

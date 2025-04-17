@@ -45,6 +45,7 @@ export default function TappletsDev() {
 
     const handleApply = useCallback(
         async (data: { endpoint: string }) => {
+            console.warn('dev tapp', data.endpoint);
             await addDevTapp(data.endpoint);
         },
         [addDevTapp]
