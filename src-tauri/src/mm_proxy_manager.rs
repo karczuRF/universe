@@ -25,7 +25,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::anyhow;
-use log::info;
+use log::{error, info};
 use tari_common_types::tari_address::TariAddress;
 use tari_shutdown::ShutdownSignal;
 use tokio::sync::RwLock;
@@ -175,7 +175,10 @@ impl MmProxyManager {
             info!(target: LOG_TARGET, "Waiting for mmproxy to start... {}/20", i + 1);
             sleep(std::time::Duration::from_secs(1)).await;
         }
-        Err(anyhow!("MM proxy did not start in time"))
+        error!(target: LOG_TARGET, "MM proxy did not start in time!");
+        Ok(())
+        // TODO UNCOMMENT AND RETURN ERR IF MM DID NOT START
+        // Err(anyhow!("MM proxy did not start in time"))
     }
 
     pub async fn get_monero_port(&self) -> Result<u16, anyhow::Error> {

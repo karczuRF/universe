@@ -934,77 +934,78 @@ async fn setup_inner(
         let (addr, cancel_token) = start(tapp_assets_path).await.unwrap(); //TODO unwrap
         app.manage(AssetServer { addr, cancel_token });
 
+        // TODO uncomment if local node setup implemented
         // run local node
-        if state.config.read().await.ootle_node_enabled() {
-            let _unused = telemetry_service
-                .send(
-                    "starting-validator-node".to_string(),
-                    json!({
-                        "service": "starting-validator-node",
-                        "percentage":86,
-                    }),
-                )
-                .await;
-            progress.set_max(87).await;
-            progress
-                .update("starting-validator-node".to_string(), None, 0)
-                .await;
+        // if state.config.read().await.ootle_node_enabled() {
+        //     let _unused = telemetry_service
+        //         .send(
+        //             "starting-validator-node".to_string(),
+        //             json!({
+        //                 "service": "starting-validator-node",
+        //                 "percentage":86,
+        //             }),
+        //         )
+        //         .await;
+        //     progress.set_max(87).await;
+        //     progress
+        //         .update("starting-validator-node".to_string(), None, 0)
+        //         .await;
 
-            let base_node_grpc = state.node_manager.get_grpc_port().await?;
-            info!(target: LOG_TARGET, "🌐 Base Node GRPC PORT VN {:?}", &base_node_grpc);
-            let validator_node_config = ValidatorNodeConfig::builder()
-                .with_base_node(base_node_grpc)
-                .with_base_path(&data_dir)
-                .build()?;
-            let tcp_port = state.node_manager.get_tcp_listener_port().await;
-            info!(target: LOG_TARGET, "🌐 Base Node TCP {:?}", &tcp_port);
+        //     let base_node_grpc = state.node_manager.get_grpc_port().await?;
+        //     info!(target: LOG_TARGET, "🌐 Base Node GRPC PORT VN {:?}", &base_node_grpc);
+        //     let validator_node_config = ValidatorNodeConfig::builder()
+        //         .with_base_node(base_node_grpc)
+        //         .with_base_path(&data_dir)
+        //         .build()?;
+        //     let tcp_port = state.node_manager.get_tcp_listener_port().await;
+        //     info!(target: LOG_TARGET, "🌐 Base Node TCP {:?}", &tcp_port);
 
-            state
-                .validator_node_manager
-                .ensure_started(
-                    state.shutdown.to_signal(),
-                    validator_node_config,
-                    data_dir.clone(),
-                    config_dir.clone(),
-                    log_dir.clone(),
-                )
-                .await?;
+        //     state
+        //         .validator_node_manager
+        //         .ensure_started(
+        //             state.shutdown.to_signal(),
+        //             validator_node_config,
+        //             data_dir.clone(),
+        //             config_dir.clone(),
+        //             log_dir.clone(),
+        //         )
+        //         .await?;
 
-            info!(target: LOG_TARGET, "🚀 Ootle enabled & Tari Validator Node started");
-            let _unused = telemetry_service
-                .send(
-                    "starting-tari-indexer".to_string(),
-                    json!({
-                        "service": "starting-tari-indexer",
-                        "percentage":87,
-                    }),
-                )
-                .await;
+        //     info!(target: LOG_TARGET, "🚀 Ootle enabled & Tari Validator Node started");
+        //     let _unused = telemetry_service
+        //         .send(
+        //             "starting-tari-indexer".to_string(),
+        //             json!({
+        //                 "service": "starting-tari-indexer",
+        //                 "percentage":87,
+        //             }),
+        //         )
+        //         .await;
 
-            progress.set_max(90).await;
-            progress
-                .update("starting-tari-indexe".to_string(), None, 0)
-                .await;
-            let indexer_config = IndexerConfig::builder()
-                .with_base_node(base_node_grpc)
-                .with_base_path(data_dir.clone())
-                .build()?;
+        //     progress.set_max(88).await;
+        //     progress
+        //         .update("starting-tari-indexe".to_string(), None, 0)
+        //         .await;
+        //     let indexer_config = IndexerConfig::builder()
+        //         .with_base_node(base_node_grpc)
+        //         .with_base_path(data_dir.clone())
+        //         .build()?;
 
-            state
-                .indexer_manager
-                .ensure_started(
-                    state.shutdown.to_signal(),
-                    indexer_config,
-                    data_dir.clone(),
-                    config_dir.clone(),
-                    log_dir.clone(),
-                )
-                .await?;
+        //     state
+        //         .indexer_manager
+        //         .ensure_started(
+        //             state.shutdown.to_signal(),
+        //             indexer_config,
+        //             data_dir.clone(),
+        //             config_dir.clone(),
+        //             log_dir.clone(),
+        //         )
+        //         .await?;
 
-            info!(target: LOG_TARGET, "🚀 Ootle enabled & Tari Indexer started");
-        }
+        //     info!(target: LOG_TARGET, "🚀 Ootle enabled & Tari Indexer started");
+        // }
     }
-
+    progress.set_max(90).await;
     info!(target: LOG_TARGET, "🚀 Ootle section done {:?}", is_ootle);
     let _unused = telemetry_service
         .send(
@@ -1021,6 +1022,7 @@ async fn setup_inner(
         .await;
 
     let base_node_grpc_port = state.node_manager.get_grpc_port().await?;
+    info!(target: LOG_TARGET, "🚀🚀🚀 start mm proxy");
 
     let config = state.config.read().await;
     let p2pool_port = state.p2pool_manager.grpc_port().await;
@@ -1039,8 +1041,10 @@ async fn setup_inner(
             use_monero_fail: config.mmproxy_use_monero_fail(),
         })
         .await?;
+
     mm_proxy_manager.wait_ready().await?;
     drop(config);
+    info!(target: LOG_TARGET, "🚀🚀🚀 wait ready done");
 
     *state.is_setup_finished.write().await = true;
     let _unused = telemetry_service
@@ -1072,38 +1076,40 @@ async fn setup_inner(
     );
 
     // TODO disable orphan checker for local node
-    let app_handle_clone: tauri::AppHandle = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let mut interval: time::Interval = time::interval(Duration::from_secs(30));
-        let mut has_send_error = false;
+    if !is_ootle {
+        let app_handle_clone: tauri::AppHandle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let mut interval: time::Interval = time::interval(Duration::from_secs(30));
+            let mut has_send_error = false;
 
-        loop {
-            let state = app_handle_clone.state::<UniverseAppState>().inner();
-            if state.shutdown.is_triggered() {
-                break;
-            }
+            loop {
+                let state = app_handle_clone.state::<UniverseAppState>().inner();
+                if state.shutdown.is_triggered() {
+                    break;
+                }
 
-            interval.tick().await;
-            let check_if_orphan = state
-                .node_manager
-                .check_if_is_orphan_chain(!has_send_error)
-                .await;
-            match check_if_orphan {
-                Ok(is_stuck) => {
-                    if is_stuck {
-                        error!(target: LOG_TARGET, "Miner is stuck on orphan chain");
+                interval.tick().await;
+                let check_if_orphan = state
+                    .node_manager
+                    .check_if_is_orphan_chain(!has_send_error)
+                    .await;
+                match check_if_orphan {
+                    Ok(is_stuck) => {
+                        if is_stuck {
+                            error!(target: LOG_TARGET, "Miner is stuck on orphan chain");
+                        }
+                        if is_stuck && !has_send_error {
+                            has_send_error = true;
+                        }
+                        drop(app_handle_clone.emit("is_stuck", is_stuck));
                     }
-                    if is_stuck && !has_send_error {
-                        has_send_error = true;
+                    Err(ref e) => {
+                        error!(target: LOG_TARGET, "{}", e);
                     }
-                    drop(app_handle_clone.emit("is_stuck", is_stuck));
-                }
-                Err(ref e) => {
-                    error!(target: LOG_TARGET, "{}", e);
                 }
             }
-        }
-    });
+        });
+    }
 
     let app_handle_clone: tauri::AppHandle = app.clone();
     tauri::async_runtime::spawn(async move {
