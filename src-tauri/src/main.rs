@@ -30,7 +30,7 @@ use events_manager::EventsManager;
 use gpu_miner_adapter::GpuMinerStatus;
 use hardware::hardware_status_monitor::HardwareStatusMonitor;
 use indexer_manager::{IndexerConfig, IndexerManager};
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use node_adapter::BaseNodeStatus;
 use ootle::tapplet_server::start;
 use ootle::wallet_daemon::spawn_wallet_daemon;

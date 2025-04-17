@@ -109,7 +109,7 @@ impl ProcessAdapter for MinotariNodeAdapter {
     fn spawn_inner(
         &self,
         data_dir: PathBuf,
-        config_dir: PathBuf,
+        _config_dir: PathBuf,
         log_dir: PathBuf,
         binary_version_path: PathBuf,
         _is_first_start: bool,

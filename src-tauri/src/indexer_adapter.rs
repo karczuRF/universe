@@ -155,7 +155,7 @@ impl IndexerStatusMonitor {
 
 #[async_trait]
 impl StatusMonitor for IndexerStatusMonitor {
-    async fn check_health(&self, uptime: Duration) -> HealthStatus {
+    async fn check_health(&self, _uptime: Duration) -> HealthStatus {
         if self.status().await.is_ok() {
             HealthStatus::Healthy
         } else {

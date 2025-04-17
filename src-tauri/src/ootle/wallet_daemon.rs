@@ -13,11 +13,7 @@ use crate::{
 use log::{error, info};
 use tari_common_dan2::configuration::Network;
 use tari_dan_app_utilities::configuration::load_configuration;
-use tari_dan_wallet_daemon::{
-    cli::Cli,
-    config::{ApplicationConfig, WalletDaemonConfig},
-    run_tari_dan_wallet_daemon,
-};
+use tari_dan_wallet_daemon::{cli::Cli, config::ApplicationConfig, run_tari_dan_wallet_daemon};
 use tari_shutdown_dan2::Shutdown;
 use tauri::Url;
 

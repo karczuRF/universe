@@ -3,9 +3,8 @@ use crate::ootle::error::{
     TappletServerError::*,
 };
 
-use axum::{response::IntoResponse, Router};
+use axum::Router;
 use log::{error, info};
-use reqwest::StatusCode;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
