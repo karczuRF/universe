@@ -103,7 +103,6 @@ const OotleWalletBalance = () => {
                         </Stack>
                     </SettingsGroupContent>
                 </SettingsGroup>
-
                 <SelectAccount accountsList={ootleAccountsList} currentAccount={ootleAccount} />
             </SettingsGroupWrapper>
         </>

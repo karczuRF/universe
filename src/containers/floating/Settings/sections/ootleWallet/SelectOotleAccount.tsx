@@ -1,12 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
-import Box from '@mui/material/Box';
-import { DialogContent, FormControl, MenuItem, SelectChangeEvent } from '@mui/material';
 import { useOotleWalletStore } from '@app/store/useOotleWalletStore';
 import { AccountInfo } from '@tari-project/typescript-bindings';
 import { OotleAccount } from '@app/types/ootle';
-import { SquaredButton } from '@app/components/elements/buttons/SquaredButton';
 import { Input } from '@app/components/elements/inputs/Input';
-import { SettingsGroup, SettingsGroupContent } from '../../components/SettingsGroup.styles';
+import { SettingsGroup, SettingsGroupContent, SettingsGroupWrapper } from '../../components/SettingsGroup.styles';
 import { Button } from '@app/components/elements/buttons/Button';
 import styled from 'styled-components';
 import { Select } from '@app/components/elements/inputs/Select';
@@ -55,7 +52,18 @@ function SelectOotleAccount({ accountsList, currentAccount }: SelectAccountProps
 
     //TODO refactor select component
     return (
-        <Box>
+        <SettingsGroupWrapper>
+            <SettingsGroupContent>
+                <Wrapper>
+                    <Select
+                        options={accountOptions}
+                        onChange={handleAccountChange}
+                        selectedValue={currentAccountName}
+                        variant="bordered"
+                        forceHeight={36}
+                    />
+                </Wrapper>
+            </SettingsGroupContent>
             <SettingsGroup>
                 <Input
                     name="new-account-name"
@@ -68,18 +76,7 @@ function SelectOotleAccount({ accountsList, currentAccount }: SelectAccountProps
                     {'Create account'}
                 </Button>
             </SettingsGroup>
-            <SettingsGroupContent>
-                <Wrapper>
-                    <Select
-                        options={accountOptions}
-                        onChange={handleAccountChange}
-                        selectedValue={currentAccountName}
-                        variant="bordered"
-                        forceHeight={36}
-                    />
-                </Wrapper>
-            </SettingsGroupContent>
-        </Box>
+        </SettingsGroupWrapper>
     );
 }
 
