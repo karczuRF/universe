@@ -10,6 +10,7 @@ import {
 } from '@app/types/ootle/tapplet.ts';
 import { useTappletSignerStore } from './useTappletSignerStore.ts';
 import { setError } from './index.ts';
+import { fetch } from '@tauri-apps/plugin-http';
 
 export const TAPPLET_CONFIG_FILE = 'tapplet.config.json'; //TODO
 
@@ -121,9 +122,22 @@ export const useTappletsStore = create<TappletsStoreState>()((set, get) => ({
         const tappProviderState = useTappletSignerStore.getState();
         // dev tapplet
         if (isDev) {
+            console.info('Set Dev Tapplet');
             const tapplet = get().devTapplets.find((tapp) => tapp.id === tappletId);
+            console.info('Set Dev Tapplet: ', tapplet?.display_name);
             if (!tapplet) return;
-            const resp = await fetch(`${tapplet.endpoint}/${TAPPLET_CONFIG_FILE}`);
+            // const resp = await fetch(`${tapplet.endpoint}/${TAPPLET_CONFIG_FILE}`, {
+            //     method: 'GET',
+            //     headers: {
+            //         'Content-Type': 'application/json',
+            //     },
+            // });
+
+            // TODO FETCH
+            const resp = await fetch(`${tapplet.endpoint}/${TAPPLET_CONFIG_FILE}`, {
+                method: 'GET',
+            });
+            console.info('Dev Tapplet fetch resp: ', resp);
             if (!resp.ok) return;
             const config: TappletConfig = await resp.json();
             console.info('Dev Tapplet config', config);

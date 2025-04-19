@@ -93,7 +93,7 @@ pub struct AppConfigFromFile {
     custom_max_cpu_usage: Option<u32>,
     #[serde(default = "default_custom_max_gpu_usage")]
     custom_max_gpu_usage: Option<Vec<GpuThreads>>,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_false")]
     auto_update: bool,
     #[serde(default = "default_false")]
     keyring_accessed: bool,
@@ -155,7 +155,7 @@ impl Default for AppConfigFromFile {
             mmproxy_monero_nodes: default_monero_nodes(),
             mmproxy_use_monero_fail: false,
             keyring_accessed: false,
-            auto_update: true,
+            auto_update: false,
             custom_power_levels_enabled: true,
             sharing_enabled: true,
             visual_mode: true,
@@ -325,7 +325,7 @@ impl AppConfig {
             mmproxy_use_monero_fail: false,
             mmproxy_monero_nodes: default_monero_nodes(),
             custom_power_levels_enabled: true,
-            auto_update: true,
+            auto_update: false,
             sharing_enabled: true,
             visual_mode: true,
             window_settings: default_window_settings(),

@@ -44,7 +44,9 @@ pub async fn spawn_wallet_daemon(
     )?;
 
     let mut cli = Cli::init();
-    let network = Network::get_current_or_user_setting_or_default();
+    // TODO uncomment if Igor config build fixed
+    // let network = Network::get_current_or_user_setting_or_default();
+    let network = Network::Igor;
     cli.common.network = Some(network);
     cli.common.base_path = data_dir.to_str().unwrap().to_owned();
     cli.common.config = wallet_daemon_config_file.clone();

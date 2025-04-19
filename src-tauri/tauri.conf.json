@@ -1,5 +1,5 @@
 {
-    "version": "0.9.840",
+    "version": "0.2.1",
     "productName": "Tari Universe (Alpha)",
     "mainBinaryName": "Tari Universe (Alpha)",
     "identifier": "com.tari.universe.alpha",
@@ -35,18 +35,25 @@
     },
     "app": {
         "security": {
-            "capabilities": ["desktop-capability", "default", "migrated"],
+            "capabilities": ["desktop-capability", "default", "migrated", "http-capability"],
             "dangerousDisableAssetCspModification": ["style-src"],
             "csp": {
-                "default-src": "'self' tauri: https:",
+                "default-src": "'self' tauri: https: http://localhost http://localhost/* http://127.0.0.1 http://127.0.0.1:*",
                 "style-src": "'self' 'unsafe-inline'",
                 "connect-src": [
                     "'self'",
                     "https:",
                     "wss://ut.tari.com",
                     "tauri:",
+                    "tauri://*",
+                    "tauri://localhost",
+                    "tauri://localhost/",
+                    "tauri://localhost:*",
                     "ipc:",
                     "http://ipc.localhost",
+                    "http://localhost",
+                    "http://localhost/",
+                    "http://localhost:*",
                     "data:",
                     "blob:",
                     "application/octet-stream",
@@ -54,7 +61,7 @@
                 ],
                 "script-src": "'self' 'unsafe-eval'",
                 "worker-src": "'self' blob: https://cdn.npmjs.com/@tari-project/tari-tower",
-                "img-src": "'self' data: blob: base64: https://*.twimg.com https://cdn.npmjs.com/@tari-project/tari-tower",
+                "img-src": "'self' data: blob: base64: https://*.twimg.com https://cdn.npmjs.com/@tari-project/tari-tower http://127.0.0.1 http://127.0.0.1/ http://127.0.0.1:* http://localhost http://localhost/ http://localhost:*",
                 "object-src": "'self' data: blob:",
                 "script-src-elem": "'self' 'unsafe-inline' 'unsafe-eval'"
             },
@@ -74,7 +81,7 @@
         "withGlobalTauri": true,
         "windows": [
             {
-                "title": "Tari Universe (Alpha) | Testnet",
+                "title": "Tari Universe (Ootle) | Testnet",
                 "label": "main",
                 "width": 1300,
                 "height": 731,
@@ -92,9 +99,7 @@
     "plugins": {
         "updater": {
             "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYxNUJBOEFEQkQ4RjJBMjYKUldRbUtvKzlyYWhiOFJIUmFFditENVV3d3hRbjNlZm1DMi9aMjluRUpVdHhQTytadTV3ODN3bUMK",
-            "endpoints": [
-                "https://raw.githubusercontent.com/tari-project/universe/main/.updater/alpha-latest.json"
-            ],
+            "endpoints": ["https://raw.githubusercontent.com/tari-project/universe/main/.updater/alpha-latest.json"],
             "windows": {
                 "installMode": "passive"
             }

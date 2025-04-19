@@ -209,7 +209,7 @@ impl StatusMonitor for MergeMiningProxyStatusMonitor {
             )
             .is_ok()
         {
-        HealthStatus::Healthy
+            HealthStatus::Healthy
         } else {
             HealthStatus::Warning
         }

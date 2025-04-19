@@ -414,11 +414,11 @@ async fn setup_inner(
     let telemetry_service = &telemetry_service.read().await;
 
     let mut binary_resolver = BinaryResolver::current().write().await;
-    let should_check_for_update = now
-        .duration_since(last_binaries_update_timestamp)
-        .unwrap_or(Duration::from_secs(0))
-        > Duration::from_secs(60 * 60 * 6);
-    // let should_check_for_update = false; // TODO tmp solution
+    // let should_check_for_update = now
+    //     .duration_since(last_binaries_update_timestamp)
+    //     .unwrap_or(Duration::from_secs(0))
+    //     > Duration::from_secs(60 * 60 * 6);
+    let should_check_for_update = false; // TODO tmp solution
 
     telemetry_service
         .send(
@@ -1319,6 +1319,7 @@ fn main() {
     let app_state_clone = app_state.clone();
     #[allow(deprecated, reason = "This is a temporary fix until the new tauri API is released")]
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_sentry::init_with_no_injection(&client))
