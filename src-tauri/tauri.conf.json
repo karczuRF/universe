@@ -35,10 +35,10 @@
     },
     "app": {
         "security": {
-            "capabilities": ["desktop-capability", "default", "migrated", "http-capability"],
+            "capabilities": ["desktop-capability", "default", "migrated"],
             "dangerousDisableAssetCspModification": ["style-src"],
             "csp": {
-                "default-src": "'self' tauri: https: http://localhost http://localhost/* http://127.0.0.1 http://127.0.0.1:*",
+                "default-src": "'self' tauri: https: http://localhost:* http://127.0.0.1:*",
                 "style-src": "'self' 'unsafe-inline'",
                 "connect-src": [
                     "'self'",

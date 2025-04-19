@@ -122,36 +122,35 @@ export const useTappletsStore = create<TappletsStoreState>()((set, get) => ({
         const tappProviderState = useTappletSignerStore.getState();
         // dev tapplet
         if (isDev) {
-            console.info('Set Dev Tapplet');
-            const tapplet = get().devTapplets.find((tapp) => tapp.id === tappletId);
-            console.info('Set Dev Tapplet: ', tapplet?.display_name);
-            if (!tapplet) return;
-            // const resp = await fetch(`${tapplet.endpoint}/${TAPPLET_CONFIG_FILE}`, {
-            //     method: 'GET',
-            //     headers: {
-            //         'Content-Type': 'application/json',
-            //     },
-            // });
-
-            // TODO FETCH
-            const resp = await fetch(`${tapplet.endpoint}/${TAPPLET_CONFIG_FILE}`, {
-                method: 'GET',
-            });
-            console.info('Dev Tapplet fetch resp: ', resp);
-            if (!resp.ok) return;
-            const config: TappletConfig = await resp.json();
-            console.info('Dev Tapplet config', config);
-            if (!config) return;
-            const activeTapplet: ActiveTapplet = {
-                tapplet_id: tapplet.id,
-                version: config.version,
-                display_name: tapplet.display_name,
-                source: tapplet.endpoint,
-                permissions: config.permissions,
-                supportedChain: config.supportedChain,
-            };
-            set({ activeTapplet });
-            tappProviderState.setTappletSigner(config.packageName, activeTapplet);
+            try {
+                console.info('Set Dev Tapplet');
+                const tapplet = get().devTapplets.find((tapp) => tapp.id === tappletId);
+                console.info('Set Dev Tapplet: ', tapplet?.display_name);
+                if (!tapplet) return;
+                const url = `${tapplet.endpoint}/${TAPPLET_CONFIG_FILE}`;
+                console.info('Dev Tapplet fetch url: ', url);
+                const resp = await fetch(url, {
+                    method: 'GET',
+                });
+                console.info('Dev Tapplet fetch resp: ', resp);
+                if (!resp.ok) return;
+                const config: TappletConfig = await resp.json();
+                console.info('Dev Tapplet config', config);
+                if (!config) return;
+                const activeTapplet: ActiveTapplet = {
+                    tapplet_id: tapplet.id,
+                    version: config.version,
+                    display_name: tapplet.display_name,
+                    source: tapplet.endpoint,
+                    permissions: config.permissions,
+                    supportedChain: config.supportedChain,
+                };
+                set({ activeTapplet });
+                tappProviderState.setTappletSigner(config.packageName, activeTapplet);
+            } catch (error) {
+                console.error('Error running Dev Tapplet: ', error);
+                setError(`'Error running Dev Tapplet: ${error}`);
+            }
             return;
         }
 

@@ -20,6 +20,7 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
             const width = tappletRef.current.offsetWidth;
             const tappletWindow = tappletRef.current.contentWindow;
 
+            console.info('🤝🤝 [TU Tapplet][window size] source:', source);
             provider?.setWindowSize(width, height);
             provider?.sendWindowSizeMessage(tappletWindow, 'tauri://localhost');
         }
@@ -32,6 +33,7 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
                 const width = tappletRef.current.offsetWidth;
                 const tappletWindow = tappletRef.current.contentWindow;
 
+                console.info('🤝🤝 [TU Tapplet][handle msg] source:', source);
                 provider?.setWindowSize(width, height);
                 provider?.sendWindowSizeMessage(tappletWindow, 'tauri://localhost');
             }

@@ -419,463 +419,470 @@ async fn setup_inner(
     //     .unwrap_or(Duration::from_secs(0))
     //     > Duration::from_secs(60 * 60 * 6);
     let should_check_for_update = false; // TODO tmp solution
+    let skip_setup = true;
 
-    telemetry_service
-        .send(
-            "benchmarking-network".to_string(),
-            json!({
-                "service": "speedtest",
-                "percentage": 0,
-            }),
-        )
-        .await?;
-    progress.set_max(5).await;
-    progress
-        .update("benchmarking-network".to_string(), None, 0)
-        .await;
-
-    NetworkStatus::current()
-        .run_speed_test_with_timeout(&app)
-        .await;
-
-    if use_tor && !cfg!(target_os = "macos") {
+    if !skip_setup {
         telemetry_service
             .send(
-                "checking-latest-version-tor".to_string(),
+                "benchmarking-network".to_string(),
                 json!({
-                    "service": "tor_manager",
-                    "percentage": 5,
+                    "service": "speedtest",
+                    "percentage": 0,
                 }),
             )
             .await?;
-        progress.set_max(10).await;
+        progress.set_max(5).await;
         progress
-            .update("checking-latest-version-tor".to_string(), None, 0)
+            .update("benchmarking-network".to_string(), None, 0)
+            .await;
+
+        NetworkStatus::current()
+            .run_speed_test_with_timeout(&app)
+            .await;
+
+        if use_tor && !cfg!(target_os = "macos") {
+            telemetry_service
+                .send(
+                    "checking-latest-version-tor".to_string(),
+                    json!({
+                        "service": "tor_manager",
+                        "percentage": 5,
+                    }),
+                )
+                .await?;
+            progress.set_max(10).await;
+            progress
+                .update("checking-latest-version-tor".to_string(), None, 0)
+                .await;
+            binary_resolver
+                .initialize_binary_timeout(
+                    Binaries::Tor,
+                    progress.clone(),
+                    should_check_for_update,
+                    rx.clone(),
+                )
+                .await?;
+            sleep(Duration::from_secs(1));
+        }
+
+        let _unused = telemetry_service
+            .send(
+                "checking-latest-version-node".to_string(),
+                json!({
+                    "service": "node_manager",
+                    "percentage": 10,
+                }),
+            )
+            .await;
+        progress.set_max(15).await;
+        progress
+            .update("checking-latest-version-node".to_string(), None, 0)
             .await;
         binary_resolver
             .initialize_binary_timeout(
-                Binaries::Tor,
+                Binaries::MinotariNode,
                 progress.clone(),
                 should_check_for_update,
                 rx.clone(),
             )
             .await?;
         sleep(Duration::from_secs(1));
-    }
 
-    let _unused = telemetry_service
-        .send(
-            "checking-latest-version-node".to_string(),
-            json!({
-                "service": "node_manager",
-                "percentage": 10,
-            }),
-        )
-        .await;
-    progress.set_max(15).await;
-    progress
-        .update("checking-latest-version-node".to_string(), None, 0)
-        .await;
-    binary_resolver
-        .initialize_binary_timeout(
-            Binaries::MinotariNode,
-            progress.clone(),
-            should_check_for_update,
-            rx.clone(),
-        )
-        .await?;
-    sleep(Duration::from_secs(1));
-
-    let _unused = telemetry_service
-        .send(
-            "checking-latest-version-mmproxy".to_string(),
-            json!({
-                "service": "mmproxy",
-                "percentage": 15,
-            }),
-        )
-        .await;
-    progress.set_max(20).await;
-    progress
-        .update("checking-latest-version-mmproxy".to_string(), None, 0)
-        .await;
-    binary_resolver
-        .initialize_binary_timeout(
-            Binaries::MergeMiningProxy,
-            progress.clone(),
-            should_check_for_update,
-            rx.clone(),
-        )
-        .await?;
-    sleep(Duration::from_secs(1));
-
-    let _unused = telemetry_service
-        .send(
-            "checking-latest-version-wallet".to_string(),
-            json!({
-                "service": "wallet",
-                "percentage": 20,
-            }),
-        )
-        .await;
-    progress.set_max(25).await;
-    progress
-        .update("checking-latest-version-wallet".to_string(), None, 0)
-        .await;
-    binary_resolver
-        .initialize_binary_timeout(
-            Binaries::Wallet,
-            progress.clone(),
-            should_check_for_update,
-            rx.clone(),
-        )
-        .await?;
-    sleep(Duration::from_secs(1));
-
-    let _unused = telemetry_service
-        .send(
-            "checking-latest-version-gpuminer".to_string(),
-            json!({
-                "service": "gpuminer",
-                "percentage":25,
-            }),
-        )
-        .await;
-    progress.set_max(30).await;
-    progress
-        .update("checking-latest-version-gpuminer".to_string(), None, 0)
-        .await;
-    binary_resolver
-        .initialize_binary_timeout(
-            Binaries::GpuMiner,
-            progress.clone(),
-            should_check_for_update,
-            rx.clone(),
-        )
-        .await?;
-    sleep(Duration::from_secs(1));
-
-    let _unused = telemetry_service
-        .send(
-            "checking-latest-version-xmrig".to_string(),
-            json!({
-                "service": "xmrig",
-                "percentage":30,
-            }),
-        )
-        .await;
-    progress.set_max(35).await;
-    progress
-        .update("checking-latest-version-xmrig".to_string(), None, 0)
-        .await;
-    binary_resolver
-        .initialize_binary_timeout(
-            Binaries::Xmrig,
-            progress.clone(),
-            should_check_for_update,
-            rx.clone(),
-        )
-        .await?;
-    sleep(Duration::from_secs(1));
-
-    let _unused = telemetry_service
-        .send(
-            "checking-latest-version-sha-p2pool".to_string(),
-            json!({
-                "service": "sha_p2pool",
-                "percentage":35,
-            }),
-        )
-        .await;
-    progress.set_max(40).await;
-    progress
-        .update("checking-latest-version-sha-p2pool".to_string(), None, 0)
-        .await;
-    binary_resolver
-        .initialize_binary_timeout(
-            Binaries::ShaP2pool,
-            progress.clone(),
-            should_check_for_update,
-            rx.clone(),
-        )
-        .await?;
-    sleep(Duration::from_secs(1));
-
-    info!(target: LOG_TARGET, "🚀🚀🚀 OOTLE SECTION");
-    if state.config.read().await.ootle_node_enabled() {
-        info!(target: LOG_TARGET, "🚀🚀🚀 CHECK OOTLE BINARIES");
-        //TODO tari validator node binary
-        // should check for update - for now is set to false because of local build
         let _unused = telemetry_service
             .send(
-                "checking-latest-version-tari-validator-node".to_string(),
+                "checking-latest-version-mmproxy".to_string(),
                 json!({
-                    "service": "validator-node",
+                    "service": "mmproxy",
+                    "percentage": 15,
+                }),
+            )
+            .await;
+        progress.set_max(20).await;
+        progress
+            .update("checking-latest-version-mmproxy".to_string(), None, 0)
+            .await;
+        binary_resolver
+            .initialize_binary_timeout(
+                Binaries::MergeMiningProxy,
+                progress.clone(),
+                should_check_for_update,
+                rx.clone(),
+            )
+            .await?;
+        sleep(Duration::from_secs(1));
+
+        let _unused = telemetry_service
+            .send(
+                "checking-latest-version-wallet".to_string(),
+                json!({
+                    "service": "wallet",
+                    "percentage": 20,
+                }),
+            )
+            .await;
+        progress.set_max(25).await;
+        progress
+            .update("checking-latest-version-wallet".to_string(), None, 0)
+            .await;
+        binary_resolver
+            .initialize_binary_timeout(
+                Binaries::Wallet,
+                progress.clone(),
+                should_check_for_update,
+                rx.clone(),
+            )
+            .await?;
+        sleep(Duration::from_secs(1));
+
+        let _unused = telemetry_service
+            .send(
+                "checking-latest-version-gpuminer".to_string(),
+                json!({
+                    "service": "gpuminer",
+                    "percentage":25,
+                }),
+            )
+            .await;
+        progress.set_max(30).await;
+        progress
+            .update("checking-latest-version-gpuminer".to_string(), None, 0)
+            .await;
+        binary_resolver
+            .initialize_binary_timeout(
+                Binaries::GpuMiner,
+                progress.clone(),
+                should_check_for_update,
+                rx.clone(),
+            )
+            .await?;
+        sleep(Duration::from_secs(1));
+
+        let _unused = telemetry_service
+            .send(
+                "checking-latest-version-xmrig".to_string(),
+                json!({
+                    "service": "xmrig",
+                    "percentage":30,
+                }),
+            )
+            .await;
+        progress.set_max(35).await;
+        progress
+            .update("checking-latest-version-xmrig".to_string(), None, 0)
+            .await;
+        binary_resolver
+            .initialize_binary_timeout(
+                Binaries::Xmrig,
+                progress.clone(),
+                should_check_for_update,
+                rx.clone(),
+            )
+            .await?;
+        sleep(Duration::from_secs(1));
+
+        let _unused = telemetry_service
+            .send(
+                "checking-latest-version-sha-p2pool".to_string(),
+                json!({
+                    "service": "sha_p2pool",
+                    "percentage":35,
+                }),
+            )
+            .await;
+        progress.set_max(40).await;
+        progress
+            .update("checking-latest-version-sha-p2pool".to_string(), None, 0)
+            .await;
+        binary_resolver
+            .initialize_binary_timeout(
+                Binaries::ShaP2pool,
+                progress.clone(),
+                should_check_for_update,
+                rx.clone(),
+            )
+            .await?;
+        sleep(Duration::from_secs(1));
+
+        info!(target: LOG_TARGET, "🚀🚀🚀 OOTLE SECTION");
+        if state.config.read().await.ootle_node_enabled() {
+            info!(target: LOG_TARGET, "🚀🚀🚀 CHECK OOTLE BINARIES");
+            //TODO tari validator node binary
+            // should check for update - for now is set to false because of local build
+            let _unused = telemetry_service
+                .send(
+                    "checking-latest-version-tari-validator-node".to_string(),
+                    json!({
+                        "service": "validator-node",
+                        "percentage":40,
+                    }),
+                )
+                .await;
+
+            progress.set_max(42).await;
+            progress
+                .update(
+                    "checking-latest-version-tari-validator-node".to_string(),
+                    None,
+                    0,
+                )
+                .await;
+            binary_resolver
+                .initialize_binary_timeout(
+                    Binaries::TariValidatorNode,
+                    progress.clone(),
+                    false,
+                    rx.clone(),
+                )
+                .await?;
+            sleep(Duration::from_secs(1));
+            info!(target: LOG_TARGET, "🚀 Validator node binary resolved");
+
+            let _unused = telemetry_service
+                .send(
+                    "checking-latest-version-tari-indexer".to_string(),
+                    json!({
+                        "service": "tari-indexer",
+                        "percentage":42,
+                    }),
+                )
+                .await;
+            //TODO tari ootle indexer binary
+            // should check for update - for now is set to false because of local build
+            progress.set_max(45).await;
+            progress
+                .update("checking-latest-version-tari-indexer".to_string(), None, 0)
+                .await;
+            binary_resolver
+                .initialize_binary_timeout(
+                    Binaries::TariIndexer,
+                    progress.clone(),
+                    false,
+                    rx.clone(),
+                )
+                .await?;
+            sleep(Duration::from_secs(1));
+            info!(target: LOG_TARGET, "🚀 Tari Indexer binary resolved");
+        }
+
+        if should_check_for_update {
+            info!(target: LOG_TARGET, "🚀 Check update binary");
+            state
+                .config
+                .write()
+                .await
+                .set_last_binaries_update_timestamp(now)
+                .await?;
+        }
+    }
+    //drop binary resolver to release the lock
+    drop(binary_resolver);
+
+    if !skip_setup {
+        let _unused = state
+            .gpu_miner
+            .write()
+            .await
+            .detect(
+                app.clone(),
+                config_dir.clone(),
+                state.config.read().await.gpu_engine(),
+            )
+            .await
+            .inspect_err(|e| error!(target: LOG_TARGET, "Could not detect gpu miner: {:?}", e));
+
+        HardwareStatusMonitor::current().initialize().await?;
+
+        let mut tor_control_port = None;
+        if use_tor && !cfg!(target_os = "macos") {
+            state
+                .tor_manager
+                .ensure_started(
+                    state.shutdown.to_signal(),
+                    data_dir.clone(),
+                    config_dir.clone(),
+                    log_dir.clone(),
+                )
+                .await?;
+            tor_control_port = state.tor_manager.get_control_port().await?;
+        }
+        let _unused = telemetry_service
+            .send(
+                "waiting-for-minotari-node-to-start".to_string(),
+                json!({
+                    "service": "minotari_node",
                     "percentage":40,
                 }),
             )
             .await;
 
-        progress.set_max(42).await;
-        progress
-            .update(
-                "checking-latest-version-tari-validator-node".to_string(),
-                None,
-                0,
-            )
-            .await;
-        binary_resolver
-            .initialize_binary_timeout(
-                Binaries::TariValidatorNode,
-                progress.clone(),
-                false,
-                rx.clone(),
-            )
-            .await?;
-        sleep(Duration::from_secs(1));
-        info!(target: LOG_TARGET, "🚀 Validator node binary resolved");
-
-        let _unused = telemetry_service
-            .send(
-                "checking-latest-version-tari-indexer".to_string(),
-                json!({
-                    "service": "tari-indexer",
-                    "percentage":42,
-                }),
-            )
-            .await;
-        //TODO tari ootle indexer binary
-        // should check for update - for now is set to false because of local build
         progress.set_max(45).await;
         progress
-            .update("checking-latest-version-tari-indexer".to_string(), None, 0)
+            .update("waiting-for-minotari-node-to-start".to_string(), None, 0)
             .await;
-        binary_resolver
-            .initialize_binary_timeout(Binaries::TariIndexer, progress.clone(), false, rx.clone())
-            .await?;
-        sleep(Duration::from_secs(1));
-        info!(target: LOG_TARGET, "🚀 Tari Indexer binary resolved");
-    }
-
-    if should_check_for_update {
-        info!(target: LOG_TARGET, "🚀 Check update binary");
-        state
-            .config
-            .write()
-            .await
-            .set_last_binaries_update_timestamp(now)
-            .await?;
-    }
-
-    //drop binary resolver to release the lock
-    drop(binary_resolver);
-
-    let _unused = state
-        .gpu_miner
-        .write()
-        .await
-        .detect(
-            app.clone(),
-            config_dir.clone(),
-            state.config.read().await.gpu_engine(),
-        )
-        .await
-        .inspect_err(|e| error!(target: LOG_TARGET, "Could not detect gpu miner: {:?}", e));
-
-    HardwareStatusMonitor::current().initialize().await?;
-
-    let mut tor_control_port = None;
-    if use_tor && !cfg!(target_os = "macos") {
-        state
-            .tor_manager
-            .ensure_started(
-                state.shutdown.to_signal(),
-                data_dir.clone(),
-                config_dir.clone(),
-                log_dir.clone(),
-            )
-            .await?;
-        tor_control_port = state.tor_manager.get_control_port().await?;
-    }
-    let _unused = telemetry_service
-        .send(
-            "waiting-for-minotari-node-to-start".to_string(),
-            json!({
-                "service": "minotari_node",
-                "percentage":40,
-            }),
-        )
-        .await;
-
-    progress.set_max(45).await;
-    progress
-        .update("waiting-for-minotari-node-to-start".to_string(), None, 0)
-        .await;
-    for _i in 0..2 {
-        match state
-            .node_manager
-            .ensure_started(
-                state.shutdown.to_signal(),
-                data_dir.clone(),
-                config_dir.clone(),
-                log_dir.clone(),
-                use_tor,
-                tor_control_port,
-            )
-            .await
-        {
-            Ok(_) => {}
-            Err(e) => {
-                if let NodeManagerError::ExitCode(code) = e {
-                    if STOP_ON_ERROR_CODES.contains(&code) {
-                        warn!(target: LOG_TARGET, "Database for node is corrupt or needs a reset, deleting and trying again.");
-                        state.node_manager.clean_data_folder(&data_dir).await?;
-                        let _unused = telemetry_service
-                            .send(
-                                "resetting-minotari-node-database".to_string(),
-                                json!({
-                                    "service": "minotari_node",
-                                    "percentage":45,
-                                }),
-                            )
-                            .await;
-                        progress.set_max(50).await;
-                        progress
-                            .update("minotari-node-restarting".to_string(), None, 0)
-                            .await;
-                        continue;
+        for _i in 0..2 {
+            match state
+                .node_manager
+                .ensure_started(
+                    state.shutdown.to_signal(),
+                    data_dir.clone(),
+                    config_dir.clone(),
+                    log_dir.clone(),
+                    use_tor,
+                    tor_control_port,
+                )
+                .await
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    if let NodeManagerError::ExitCode(code) = e {
+                        if STOP_ON_ERROR_CODES.contains(&code) {
+                            warn!(target: LOG_TARGET, "Database for node is corrupt or needs a reset, deleting and trying again.");
+                            state.node_manager.clean_data_folder(&data_dir).await?;
+                            let _unused = telemetry_service
+                                .send(
+                                    "resetting-minotari-node-database".to_string(),
+                                    json!({
+                                        "service": "minotari_node",
+                                        "percentage":45,
+                                    }),
+                                )
+                                .await;
+                            progress.set_max(50).await;
+                            progress
+                                .update("minotari-node-restarting".to_string(), None, 0)
+                                .await;
+                            continue;
+                        }
                     }
-                }
-                error!(target: LOG_TARGET, "Could not start node manager: {:?}", e);
+                    error!(target: LOG_TARGET, "Could not start node manager: {:?}", e);
 
-                app.exit(-1);
-                return Err(e.into());
+                    app.exit(-1);
+                    return Err(e.into());
+                }
             }
         }
-    }
-    info!(target: LOG_TARGET, "Node has started and is ready");
+        info!(target: LOG_TARGET, "Node has started and is ready");
 
-    let _unused = telemetry_service
-        .send(
-            "waiting-for-wallet".to_string(),
-            json!({
-                "service": "wallet",
-                "percentage":50,
-            }),
-        )
-        .await;
-    progress.set_max(55).await;
-    progress
-        .update("waiting-for-wallet".to_string(), None, 0)
-        .await;
-    state
-        .wallet_manager
-        .ensure_started(
-            state.shutdown.to_signal(),
-            data_dir.clone(),
-            config_dir.clone(),
-            log_dir.clone(),
-        )
-        .await?;
-
-    let _unused = telemetry_service
-        .send(
-            "wallet-started".to_string(),
-            json!({
-                "service": "wallet",
-                "percentage":55,
-            }),
-        )
-        .await;
-    progress.set_max(60).await;
-    progress.update("wallet-started".to_string(), None, 0).await;
-    progress
-        .update("waiting-for-node".to_string(), None, 0)
-        .await;
-    let _unused = telemetry_service
-        .send(
-            "preparing-for-initial-sync".to_string(),
-            json!({
-                "service": "initial_sync",
-                "percentage":60,
-            }),
-        )
-        .await;
-    progress.set_max(75).await;
-    // TODO uncomment if contractnet base node (igor) is connected without error
-    // state.node_manager.wait_synced(progress.clone()).await?;
-    // let mut telemetry_id = state
-    //     .telemetry_manager
-    //     .read()
-    //     .await
-    //     .get_unique_string()
-    //     .await;
-    if telemetry_id.is_empty() {
-        telemetry_id = "unknown_miner_tari_universe".to_string();
-    }
-
-    // Benchmark if needed.
-    progress.set_max(77).await;
-    // let mut cpu_miner_config = state.cpu_miner_config.read().await.clone();
-    // Clear out so we use default.
-    let _unused = telemetry_service
-        .send(
-            "starting-benchmarking".to_string(),
-            json!({
-                "service": "starting_benchmarking",
-                "percentage":77,
-            }),
-        )
-        .await;
-
-    let mut cpu_miner = state.cpu_miner.write().await;
-    let benchmarked_hashrate = cpu_miner
-        .start_benchmarking(
-            state.shutdown.to_signal(),
-            Duration::from_secs(30),
-            data_dir.clone(),
-            config_dir.clone(),
-            log_dir.clone(),
-        )
-        .await?;
-    drop(cpu_miner);
-
-    if p2pool_enabled {
-        progress.set_max(80).await;
         let _unused = telemetry_service
             .send(
-                "starting-p2pool".to_string(),
+                "waiting-for-wallet".to_string(),
                 json!({
-                    "service": "starting_p2pool",
-                    "percentage":80,
+                    "service": "wallet",
+                    "percentage":50,
                 }),
             )
             .await;
-        progress.set_max(85).await;
+        progress.set_max(55).await;
         progress
-            .update("starting-p2pool".to_string(), None, 0)
+            .update("waiting-for-wallet".to_string(), None, 0)
             .await;
-
-        let base_node_grpc = state.node_manager.get_grpc_port().await?;
-        let p2pool_config = P2poolConfig::builder()
-            .with_base_node(base_node_grpc)
-            .with_stats_server_port(state.config.read().await.p2pool_stats_server_port())
-            .with_cpu_benchmark_hashrate(Some(benchmarked_hashrate))
-            .build()?;
-        info!(target: LOG_TARGET, "🌐 Base Node GRPC PORT p2p {:?}", &base_node_grpc);
-
         state
-            .p2pool_manager
+            .wallet_manager
             .ensure_started(
                 state.shutdown.to_signal(),
-                p2pool_config,
                 data_dir.clone(),
                 config_dir.clone(),
                 log_dir.clone(),
             )
             .await?;
-    }
 
+        let _unused = telemetry_service
+            .send(
+                "wallet-started".to_string(),
+                json!({
+                    "service": "wallet",
+                    "percentage":55,
+                }),
+            )
+            .await;
+        progress.set_max(60).await;
+        progress.update("wallet-started".to_string(), None, 0).await;
+        progress
+            .update("waiting-for-node".to_string(), None, 0)
+            .await;
+        let _unused = telemetry_service
+            .send(
+                "preparing-for-initial-sync".to_string(),
+                json!({
+                    "service": "initial_sync",
+                    "percentage":60,
+                }),
+            )
+            .await;
+        progress.set_max(75).await;
+        state.node_manager.wait_synced(progress.clone()).await?;
+        let mut telemetry_id = state
+            .telemetry_manager
+            .read()
+            .await
+            .get_unique_string()
+            .await;
+        if telemetry_id.is_empty() {
+            telemetry_id = "unknown_miner_tari_universe".to_string();
+        }
+
+        // Benchmark if needed.
+        progress.set_max(77).await;
+        // let mut cpu_miner_config = state.cpu_miner_config.read().await.clone();
+        // Clear out so we use default.
+        let _unused = telemetry_service
+            .send(
+                "starting-benchmarking".to_string(),
+                json!({
+                    "service": "starting_benchmarking",
+                    "percentage":77,
+                }),
+            )
+            .await;
+
+        let mut cpu_miner = state.cpu_miner.write().await;
+        let benchmarked_hashrate = cpu_miner
+            .start_benchmarking(
+                state.shutdown.to_signal(),
+                Duration::from_secs(30),
+                data_dir.clone(),
+                config_dir.clone(),
+                log_dir.clone(),
+            )
+            .await?;
+        drop(cpu_miner);
+
+        if p2pool_enabled {
+            progress.set_max(80).await;
+            let _unused = telemetry_service
+                .send(
+                    "starting-p2pool".to_string(),
+                    json!({
+                        "service": "starting_p2pool",
+                        "percentage":80,
+                    }),
+                )
+                .await;
+            progress.set_max(85).await;
+            progress
+                .update("starting-p2pool".to_string(), None, 0)
+                .await;
+
+            let base_node_grpc = state.node_manager.get_grpc_port().await?;
+            let p2pool_config = P2poolConfig::builder()
+                .with_base_node(base_node_grpc)
+                .with_stats_server_port(state.config.read().await.p2pool_stats_server_port())
+                .with_cpu_benchmark_hashrate(Some(benchmarked_hashrate))
+                .build()?;
+            info!(target: LOG_TARGET, "🌐 Base Node GRPC PORT p2p {:?}", &base_node_grpc);
+
+            state
+                .p2pool_manager
+                .ensure_started(
+                    state.shutdown.to_signal(),
+                    p2pool_config,
+                    data_dir.clone(),
+                    config_dir.clone(),
+                    log_dir.clone(),
+                )
+                .await?;
+        }
+    }
     //TODO RUN OOTLE
     let is_ootle = state.config.read().await.ootle_enabled();
     info!(target: LOG_TARGET, "🚀 Ootle? {:?}", is_ootle);
@@ -1024,26 +1031,28 @@ async fn setup_inner(
     let base_node_grpc_port = state.node_manager.get_grpc_port().await?;
     info!(target: LOG_TARGET, "🚀🚀🚀 start mm proxy");
 
-    let config = state.config.read().await;
-    let p2pool_port = state.p2pool_manager.grpc_port().await;
-    mm_proxy_manager
-        .start(StartConfig {
-            base_node_grpc_port,
-            p2pool_port,
-            app_shutdown: state.shutdown.to_signal().clone(),
-            base_path: data_dir.clone(),
-            config_path: config_dir.clone(),
-            log_path: log_dir.clone(),
-            tari_address: cpu_miner_config.tari_address.clone(),
-            coinbase_extra: telemetry_id,
-            p2pool_enabled,
-            monero_nodes: config.mmproxy_monero_nodes().clone(),
-            use_monero_fail: config.mmproxy_use_monero_fail(),
-        })
-        .await?;
+    if !skip_setup {
+        let config = state.config.read().await;
+        let p2pool_port = state.p2pool_manager.grpc_port().await;
+        mm_proxy_manager
+            .start(StartConfig {
+                base_node_grpc_port,
+                p2pool_port,
+                app_shutdown: state.shutdown.to_signal().clone(),
+                base_path: data_dir.clone(),
+                config_path: config_dir.clone(),
+                log_path: log_dir.clone(),
+                tari_address: cpu_miner_config.tari_address.clone(),
+                coinbase_extra: telemetry_id,
+                p2pool_enabled,
+                monero_nodes: config.mmproxy_monero_nodes().clone(),
+                use_monero_fail: config.mmproxy_use_monero_fail(),
+            })
+            .await?;
 
-    mm_proxy_manager.wait_ready().await?;
-    drop(config);
+        mm_proxy_manager.wait_ready().await?;
+        drop(config);
+    }
     info!(target: LOG_TARGET, "🚀🚀🚀 wait ready done");
 
     *state.is_setup_finished.write().await = true;
