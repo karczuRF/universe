@@ -22,6 +22,7 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
 
             console.info('🤝🤝 [TU Tapplet][window size] source:', source);
             provider?.setWindowSize(width, height);
+            // TODO for build set to 'tauri://localhost'
             provider?.sendWindowSizeMessage(tappletWindow, 'tauri://localhost');
         }
     }
@@ -35,6 +36,7 @@ export const Tapplet: React.FC<TappletProps> = ({ source, provider }) => {
 
                 console.info('🤝🤝 [TU Tapplet][handle msg] source:', source);
                 provider?.setWindowSize(width, height);
+                // TODO for build set to 'tauri://localhost'
                 provider?.sendWindowSizeMessage(tappletWindow, 'tauri://localhost');
             }
         } else if (event.data.type === 'signer-call') {
