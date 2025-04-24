@@ -21,6 +21,7 @@ import { Button } from '@app/components/elements/buttons/Button';
 import SyncTooltip from '@app/containers/navigation/components/Wallet/SyncTooltip/SyncTooltip.tsx';
 import { Wrapper } from './wallet.styles.ts';
 import { memo } from 'react';
+import BridgeButton from '../bridge/BridgeButton.tsx';
 
 interface Props {
     section: string;
@@ -53,6 +54,7 @@ const Wallet = memo(function Wallet({ section, setSection }: Props) {
 
             <HistoryList />
 
+            <BridgeButton />
             <BottomNavWrapper>
                 {environment === 'development' ? (
                     <>
