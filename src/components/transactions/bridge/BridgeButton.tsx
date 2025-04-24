@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ButtonWrapper, StyledButton } from './BridgeButton.styles';
 
 export default function BridgeButton() {
-    const { t } = useTranslation('bridge-view', { useSuspense: false });
+    const { t } = useTranslation('bridge', { useSuspense: false });
 
     const handleClick = useCallback(async () => {
         console.info('bridge');
@@ -20,7 +20,7 @@ export default function BridgeButton() {
                 disabled={false}
                 $isLoading={false}
             >
-                {'Bridge'}
+                {t(`buy-tari`)}
             </StyledButton>
         </ButtonWrapper>
     );
