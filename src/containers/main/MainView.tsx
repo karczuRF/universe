@@ -8,7 +8,7 @@ import { useConfigUIStore } from '@app/store';
 export default function MainView() {
     const visualMode = useConfigUIStore((s) => s.visual_mode);
     const isSettingUp = useSetupStore((s) => !s.appUnlocked);
-    // TODO add Tapplet
+
     return (
         <DashboardContainer $disableBackground={isSettingUp}>
             {!visualMode && !isSettingUp && <Background />}
