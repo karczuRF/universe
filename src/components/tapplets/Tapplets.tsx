@@ -63,7 +63,7 @@ export const Tapplet: React.FC<TappletProps> = ({ source }) => {
                 height="100%"
                 ref={tappletRef}
                 onLoad={sendWindowSize}
-                frameBorder={0}
+                style={{ background: 'transparent', border: 'none' }}
             ></iframe>
         </MiningViewContainer>
     );
