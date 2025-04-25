@@ -11,6 +11,7 @@ import { HoverIconWrapper, NavIconWrapper, NavigationWrapper, StyledIconButton }
 import { AnimatePresence } from 'motion/react';
 import { useConfigUIStore } from '@app/store/useAppConfigStore.ts';
 import { setVisualMode } from '@app/store/index.ts';
+import { BridgeOutlineSVG } from '@app/assets/icons/bridge-outline.tsx';
 
 interface NavButtonProps {
     children: ReactNode;
@@ -80,7 +81,7 @@ const BridgeNavigationButton = memo(function BridgeNavigationButton() {
     return (
         <NavigationWrapper>
             <NavButton onClick={handleToggleOpen} isActive={true}>
-                <CubeOutlineSVG />
+                <BridgeOutlineSVG />
             </NavButton>
         </NavigationWrapper>
     );
