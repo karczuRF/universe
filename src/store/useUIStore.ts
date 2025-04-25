@@ -28,6 +28,7 @@ interface UIStoreState {
     showSplashscreen: boolean;
     hideWalletBalance: boolean;
     showResumeAppModal: boolean;
+    showTapplet: boolean;
 }
 const preferredTheme = window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 
@@ -43,6 +44,7 @@ const initialState: UIStoreState = {
     showSplashscreen: true,
     hideWalletBalance: false,
     showResumeAppModal: false,
+    showTapplet: false,
 };
 
 export const useUIStore = create<UIStoreState>()(() => ({
