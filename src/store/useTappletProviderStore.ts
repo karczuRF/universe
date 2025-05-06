@@ -13,6 +13,7 @@ interface State {
 interface Actions {
     initTappletProvider: () => Promise<void>;
     setTappletProvider: (id: string, launchedTapplet: ActiveTapplet) => Promise<void>;
+    setTappletSigner: (id: string, launchedTapplet: ActiveTapplet) => Promise<void>;
     runTransaction: (event: MessageEvent<TransactionEvent>) => Promise<void>;
 }
 
@@ -53,6 +54,10 @@ export const useTappletProviderStore = create<TappletProviderStoreState>()((set,
             console.error('Error setting tapplet provider: ', error);
             setError(`Error setting tapplet provider: ${error}`);
         }
+    },
+    setTappletSigner: async (id: string, launchedTapplet: ActiveTapplet) => {
+        console.info('set tapplet signer for the tapplet:', id, launchedTapplet.display_name);
+        // TODO set tapplet signer
     },
     runTransaction: async (event: MessageEvent<TransactionEvent>) => {
         const { methodName, args, id } = event.data;

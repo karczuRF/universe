@@ -1288,7 +1288,8 @@ fn main() {
             commands::verify_address_for_send,
             commands::validate_minotari_amount,
             commands::trigger_phases_restart,
-            commands::set_node_type
+            commands::set_node_type,
+            commands::launch_tapplet,
         ])
         .build(tauri::generate_context!())
         .inspect_err(

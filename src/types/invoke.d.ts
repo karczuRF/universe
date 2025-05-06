@@ -111,4 +111,11 @@ declare module '@tauri-apps/api/core' {
     function invoke(param: 'validate_minotari_amount', payload: { amount: string }): Promise<string>;
     function invoke(param: 'trigger_phases_restart'): Promise<void>;
     function invoke(param: 'set_node_type', payload: { nodeType: NodeType }): Promise<void>;
+    function invoke(param: 'launch_tapplet', payload: { installedTappletId: number }): Promise<ActiveTapplet>;
+    function invoke(
+        param: 'download_and_extract_tapp',
+        payload: { tappletId: string }
+    ): Promise<RegisteredTappletWithAssets>;
+    function invoke(param: 'insert_installed_tapp_db', payload: { tappletId: string }): Promise<InstalledTapplet>;
+    function invoke(param: 'read_installed_tapp_db'): Promise<InstalledTappletWithAssets[]>;
 }

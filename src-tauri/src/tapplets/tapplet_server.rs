@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 use tower_http::services::ServeDir;
 const LOG_TARGET: &str = "tari::tapplet";
 
-pub async fn start(tapplet_path: PathBuf) -> Result<(String, CancellationToken), Error> {
+pub async fn start_tapplet(tapplet_path: PathBuf) -> Result<(String, CancellationToken), Error> {
     serve(using_serve_dir(tapplet_path), 0).await
 }
 
