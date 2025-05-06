@@ -1,6 +1,5 @@
 use crate::{
     database::models::TappletVersion,
-    interface::{RegisteredTapplets, TappletAssets, TappletConfig, TappletPermissions},
     tapplets::{
         error::{
             Error::{self, IOError, JsonParsingError, RequestError},
@@ -18,7 +17,10 @@ use std::{
 };
 use tauri::Manager;
 
-use super::tapp_consts::{REGISTRY_URL, TAPPLETS_ASSETS_DIR};
+use super::{
+    interface::{RegisteredTapplets, TappletAssets, TappletConfig, TappletPermissions},
+    tapp_consts::{REGISTRY_URL, TAPPLETS_ASSETS_DIR, TAPPLETS_INSTALLED_DIR},
+};
 pub const LOG_TARGET: &str = "tari::universe";
 
 pub fn delete_tapplet(tapplet_path: PathBuf) -> Result<(), Error> {
