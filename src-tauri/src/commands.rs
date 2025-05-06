@@ -44,6 +44,7 @@ use crate::node::node_manager::NodeType;
 use crate::p2pool::models::{Connections, P2poolStats};
 use crate::progress_tracker_old::ProgressTracker;
 use crate::setup::setup_manager::{SetupManager, SetupPhase};
+use crate::tapplets::{DatabaseConnection, ShutdownTokens};
 use crate::tasks_tracker::TasksTrackers;
 use crate::tor_adapter::TorConfig;
 use crate::utils::address_utils::verify_send;
@@ -1796,4 +1797,85 @@ pub async fn set_node_type(
         .await;
 
     Ok(())
+}
+
+/*
+ * TAPPLETS SECTION
+*/
+
+#[tauri::command]
+pub async fn launch_tapplet(
+    installed_tapplet_id: i32,
+    shutdown_tokens: tauri::State<'_, ShutdownTokens>,
+    db_connection: tauri::State<'_, DatabaseConnection>,
+    app_handle: tauri::AppHandle,
+) -> Result<ActiveTapplet, String> {
+    let mut locked_tokens = shutdown_tokens.0.lock().await;
+    let mut store = SqliteStore::new(db_connection.0.clone());
+
+    let (_installed_tapp, registered_tapp, tapp_version) = store
+        .get_installed_tapplet_full_by_id(installed_tapplet_id)
+        .map_err(|e| e.to_string())?;
+    // get download path
+    let version = tapp_version.clone().version;
+    let tapplet_path = get_tapp_download_path(
+        registered_tapp.registry_id,
+        version.clone(),
+        app_handle.clone(),
+    )
+    .map_err(|e| e.to_string())?;
+    let file_path = tapplet_path.join(TAPPLET_ARCHIVE);
+
+    // Extract the tapplet archieve each time before launching
+    // This way make sure that local files have not been replaced and are not malicious
+    let _ = extract(&file_path, &tapplet_path.clone())
+        .await
+        .inspect_err(|e| error!(target: LOG_TARGET, "❌ Error extracting file: {:?}", e))
+        .map_err(|e| e.to_string())?;
+
+    //TODO should compare integrity field with the one stored in db or from github manifest?
+    match check_files_and_validate_checksum(tapp_version, tapplet_path.clone()) {
+        Ok(is_valid) => {
+            info!(target: LOG_TARGET,"✅ Checksum validation successfully with test result: {:?}", is_valid);
+        }
+        Err(e) => {
+            error!(target: LOG_TARGET,"❌ Error validating checksum: {:?}", e);
+            return Err(e.to_string());
+        }
+    }
+
+    let permissions: TappletPermissions = match get_tapp_permissions(tapplet_path.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            error!(target: LOG_TARGET,"Error getting permissions: {:?}", e);
+            return Err(e.to_string());
+        }
+    };
+
+    let dist_path = tapplet_path.join(TAPPLET_DIST_DIR);
+    let handle_start = tauri::async_runtime::spawn(async move { start(dist_path).await });
+
+    let (addr, cancel_token) = match handle_start.await {
+        Ok(result) => result.map_err(|e| e.to_string())?,
+        Err(e) => {
+            error!(target: LOG_TARGET, "❌ Error handling tapplet start: {:?}", e);
+            return Err(e.to_string());
+        }
+    };
+
+    //TODO SERVER RUNNING ERROR IF LAUNCHED INSTALLED TAPPLET 2 TIMES
+    match locked_tokens.insert(installed_tapplet_id.clone(), cancel_token) {
+        Some(_) => {
+            return Err(TappletServerError(AlreadyRunning)).map_err(|e| e.to_string())?;
+        }
+        None => {}
+    }
+
+    Ok(ActiveTapplet {
+        tapplet_id: installed_tapplet_id,
+        display_name: registered_tapp.display_name,
+        source: format!("http://{}", addr),
+        version,
+        permissions,
+    })
 }
