@@ -32,7 +32,9 @@ use crate::configs::config_ui::{ConfigUI, ConfigUIContent};
 use crate::configs::config_wallet::{ConfigWallet, ConfigWalletContent};
 use crate::configs::trait_config::ConfigImpl;
 use crate::credential_manager::{CredentialError, CredentialManager};
-use crate::database::models::Tapplet;
+use crate::database::models::{
+    CreateTapplet, CreateTappletAsset, CreateTappletAudit, CreateTappletVersion, Tapplet,
+};
 use crate::database::store::SqliteStore;
 use crate::download_utils::{download_file_with_retries, extract};
 use crate::events_manager::EventsManager;
@@ -48,11 +50,16 @@ use crate::p2pool::models::{Connections, P2poolStats};
 use crate::progress_tracker_old::ProgressTracker;
 use crate::setup::setup_manager::{SetupManager, SetupPhase};
 use crate::tapplets::error::Error;
-use crate::tapplets::error::{Error::TappletServerError, TappletServerError::AlreadyRunning};
+use crate::tapplets::error::{
+    Error::TappletServerError, RequestError::FailedToDownload, TappletServerError::AlreadyRunning,
+};
+
+use crate::database::store::Store;
 use crate::tapplets::interface::{ActiveTapplet, TappletPermissions};
 use crate::tapplets::tapp_consts::{TAPPLET_ARCHIVE, TAPPLET_DIST_DIR};
 use crate::tapplets::tapplet_installer::{
-    check_files_and_validate_checksum, get_tapp_download_path, get_tapp_permissions,
+    check_files_and_validate_checksum, download_asset, fetch_tapp_registry_manifest,
+    get_tapp_download_path, get_tapp_permissions,
 };
 use crate::tapplets::tapplet_server::start_tapplet;
 use crate::tapplets::{DatabaseConnection, ShutdownTokens};
@@ -1944,4 +1951,78 @@ pub async fn download_and_extract_tapp(
         }
     }
     Ok(tapp)
+}
+
+/**
+ *  REGISTERED TAPPLETS - FETCH DATA FROM MANIFEST JSON
+ */
+#[tauri::command]
+pub async fn fetch_registered_tapplets(
+    app_handle: tauri::AppHandle,
+    db_connection: tauri::State<'_, DatabaseConnection>,
+) -> Result<(), String> {
+    let tapplets = match fetch_tapp_registry_manifest().await {
+        Ok(tapp) => tapp,
+        Err(e) => {
+            return Err(e.to_string());
+        }
+    };
+
+    let mut store = SqliteStore::new(db_connection.0.clone());
+
+    for tapplet_manifest in tapplets.registered_tapplets.values() {
+        let inserted_tapplet = store
+            .create(&CreateTapplet::from(tapplet_manifest))
+            .map_err(|e| e.to_string())?;
+
+        for audit_data in tapplet_manifest.metadata.audits.iter() {
+            let _ = store
+                .create(
+                    &(CreateTappletAudit {
+                        tapplet_id: inserted_tapplet.id,
+                        auditor: &audit_data.auditor,
+                        report_url: &audit_data.report_url,
+                    }),
+                )
+                .map_err(|e| e.to_string());
+        }
+
+        for (version, version_data) in tapplet_manifest.versions.iter() {
+            let _ = store
+                .create(
+                    &(CreateTappletVersion {
+                        tapplet_id: inserted_tapplet.id,
+                        version: &version,
+                        integrity: &version_data.integrity,
+                        registry_url: &version_data.registry_url,
+                    }),
+                )
+                .map_err(|e| e.to_string());
+        }
+        match store.get_tapplet_assets_by_tapplet_id(inserted_tapplet.id.unwrap()) {
+            Ok(Some(_)) => {}
+            Ok(None) => {
+                match download_asset(app_handle.clone(), inserted_tapplet.registry_id).await {
+                    Ok(tapplet_assets) => {
+                        let _ = store
+                            .create(
+                                &(CreateTappletAsset {
+                                    tapplet_id: inserted_tapplet.id,
+                                    icon_url: &tapplet_assets.icon_url,
+                                    background_url: &tapplet_assets.background_url,
+                                }),
+                            )
+                            .map_err(|e| e.to_string());
+                    }
+                    Err(e) => {
+                        error!(target: LOG_TARGET, "Could not download tapplet assets: {}", e);
+                    }
+                }
+            }
+            Err(e) => {
+                return Err(e.to_string());
+            }
+        }
+    }
+    Ok(())
 }

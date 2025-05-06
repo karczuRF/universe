@@ -1,10 +1,11 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ButtonWrapper, StyledButton } from './BridgeButton.styles';
-import { BRIDGE_TAPPLET_ID, useTappletsStore } from '@app/store/useTappletsStore';
+import { useTappletsStore } from '@app/store/useTappletsStore';
 import { setError, setVisualMode } from '@app/store';
 import { setShowTapplet, setSidebarOpen } from '@app/store/actions/uiStoreActions';
 
+const BRIDGE_TAPPLET_ID = 0;
 export default function BridgeButton() {
     const { t } = useTranslation('bridge', { useSuspense: false });
     const { setActiveTappById } = useTappletsStore();
