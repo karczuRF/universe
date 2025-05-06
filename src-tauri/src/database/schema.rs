@@ -4,9 +4,9 @@ diesel::table! {
     dev_tapplet (id) {
         id -> Nullable<Integer>,
         package_name -> Text,
+        version -> Text,
         endpoint -> Text,
         display_name -> Text,
-        version -> Text,
     }
 }
 

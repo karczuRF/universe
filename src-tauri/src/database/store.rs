@@ -14,7 +14,7 @@ use crate::tapplets::error::{
     DatabaseError::*,
     Error::{self, DatabaseError},
 };
-use crate::tapplets::interface::InstalledTappletWithName;
+use crate::tapplets::interface::{InstalledTappletWithName, TappletSemver};
 
 use super::models::CreateDevTapplet;
 use super::models::CreateTappletAsset;
