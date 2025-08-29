@@ -6,6 +6,7 @@ use crate::tapplets::error::{
     DatabaseError::*,
     Error::{self, DatabaseError},
 };
+use crate::tapplets::interface::TappletSemver;
 
 #[derive(Clone)]
 pub struct DatabaseConnection(pub Arc<SqlitePool>);
@@ -116,7 +117,7 @@ impl SqliteStore {
     // --- Tapplet ---
     pub async fn get_all_tapplets(&self) -> Result<Vec<Tapplet>, Error> {
         sqlx::query_as::<_, Tapplet>(
-            "SELECT id, tapp_registry_id, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category FROM tapplet"
+            "SELECT id, package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category FROM tapplet"
         )
         .fetch_all(self.get_pool())
         .await
@@ -127,7 +128,7 @@ impl SqliteStore {
 
     pub async fn get_tapplet_by_id(&self, tapplet_id: i32) -> Result<Tapplet, Error> {
         sqlx::query_as::<_, Tapplet>(
-            "SELECT id, tapp_registry_id, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category FROM tapplet WHERE id = ?"
+            "SELECT id, package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category FROM tapplet WHERE id = ?"
         )
         .bind(tapplet_id)
         .fetch_one(self.get_pool())
@@ -140,12 +141,12 @@ impl SqliteStore {
     pub async fn create_tapplet(&self, item: &CreateTapplet) -> Result<Tapplet, Error> {
         sqlx::query_as::<_, Tapplet>(
             r#"
-            INSERT INTO tapplet (tapp_registry_id, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category)
+            INSERT INTO tapplet (package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id, tapp_registry_id, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category
+            RETURNING id, package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category
             "#
         )
-        .bind(&item.tapp_registry_id)
+        .bind(&item.package_name)
         .bind(&item.display_name)
         .bind(&item.logo_url)
         .bind(&item.background_url)
@@ -165,7 +166,7 @@ impl SqliteStore {
         let result = sqlx::query(
             r#"
             UPDATE tapplet SET
-                tapp_registry_id = ?,
+                package_name = ?,
                 display_name = ?,
                 logo_url = ?,
                 background_url = ?,
@@ -177,7 +178,7 @@ impl SqliteStore {
             WHERE id = ?
             "#,
         )
-        .bind(&item.tapp_registry_id)
+        .bind(&item.package_name)
         .bind(&item.display_name)
         .bind(&item.logo_url)
         .bind(&item.background_url)
@@ -577,5 +578,102 @@ impl SqliteStore {
                 })
             })?;
         Ok(result.rows_affected())
+    }
+
+    /// Returns a Tapplet from either installed_tapplet or dev_tapplet by package_name (package_name).
+    pub async fn get_tapplet_by_name(
+        &self,
+        package_name: String,
+    ) -> Result<Option<Tapplet>, Error> {
+        // First, try to find in installed_tapplet joined with tapplet
+        if let Ok(tapplet) = sqlx::query_as::<_, Tapplet>(
+            r#"
+            SELECT t.id, t.package_name, t.display_name, t.logo_url, t.background_url, t.author_name, t.author_website, t.about_summary, t.about_description, t.category
+            FROM tapplet t
+            INNER JOIN installed_tapplet it ON it.tapplet_id = t.id
+            WHERE t.package_name = ?
+            LIMIT 1
+            "#
+        )
+        .bind(&package_name)
+        .fetch_one(self.get_pool())
+        .await
+        {
+            return Ok(Some(tapplet));
+        }
+
+        // If not found, try to find in dev_tapplet
+        if let Ok(dev) = sqlx::query_as::<_, DevTapplet>(
+            r#"
+            SELECT id, package_name, source, display_name, csp, tari_permissions
+            FROM dev_tapplet
+            WHERE package_name = ?
+            LIMIT 1
+            "#,
+        )
+        .bind(&package_name)
+        .fetch_one(self.get_pool())
+        .await
+        {
+            // Convert DevTapplet to Tapplet (fill with dummy/defaults for missing fields)
+            let tapplet = Tapplet {
+                id: dev.id,
+                package_name: dev.package_name,
+                display_name: dev.display_name,
+                logo_url: String::new(),
+                background_url: String::new(),
+                author_name: String::new(),
+                author_website: String::new(),
+                about_summary: String::new(),
+                about_description: String::new(),
+                category: String::from("dev"),
+            };
+            return Ok(Some(tapplet));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn get_registered_tapplet_with_version(
+        &self,
+        registered_tapplet_id: i32,
+    ) -> Result<(Tapplet, TappletVersion), Error> {
+        // Fetch the tapplet
+        let registered_tapplet = sqlx::query_as::<_, Tapplet>(
+        "SELECT id, package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category FROM tapplet WHERE id = ?"
+    )
+    .bind(registered_tapplet_id)
+    .fetch_one(self.get_pool())
+    .await
+    .map_err(|_| {
+        DatabaseError(FailedToRetrieveData {
+            entity_name: "tapplet".to_string(),
+        })
+    })?;
+
+        // Fetch all versions for this tapplet
+        let versions: Vec<TappletVersion> = sqlx::query_as::<_, TappletVersion>(
+        "SELECT id, tapplet_id, version, integrity, registry_url FROM tapplet_version WHERE tapplet_id = ?"
+    )
+    .bind(registered_tapplet_id)
+    .fetch_all(self.get_pool())
+    .await
+    .map_err(|_| {
+        DatabaseError(FailedToRetrieveData {
+            entity_name: "tapplet version".to_string(),
+        })
+    })?;
+
+        let versions = versions
+            .into_iter()
+            .map(|tapp_version| TappletSemver::try_from(tapp_version))
+            .collect::<Result<Vec<TappletSemver>, Error>>()?;
+
+        let latest_version = versions
+            .into_iter()
+            .max_by_key(|ver| ver.semver.clone())
+            .ok_or(Error::VersionNotFound)?;
+
+        Ok((registered_tapplet, latest_version.tapplet_version))
     }
 }

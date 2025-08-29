@@ -20,7 +20,7 @@ use tauri::Manager;
 pub const LOG_TARGET: &str = "tari::universe";
 pub const REGISTRY_URL: &str = env!("TAPP_REGISTRY_URL");
 
-pub fn delete_tapplet(tapplet_path: PathBuf) -> Result<(), Error> {
+pub fn delete_tapplet_folder(tapplet_path: PathBuf) -> Result<(), Error> {
     let path = tapplet_path
         .clone()
         .into_os_string()

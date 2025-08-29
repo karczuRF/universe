@@ -452,9 +452,8 @@ fn main() {
                 .app_data_dir()
                 .expect("Could not get app data dir");
             let db_path = app_data_dir.join(DB_FILE_NAME);
-            app.manage(DatabaseConnection(Arc::new(std::sync::Mutex::new(
-                database::establish_connection(db_path.to_str().unwrap_or_default()),
-            ))));
+            let pool = database::establish_connection(db_path.to_str().unwrap_or_default()).await;
+            app.manage(DatabaseConnection(Arc::new(pool)));
             app.manage(tapplet_manager);
 
             // Remove this after it's been rolled out for a few versions

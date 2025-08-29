@@ -61,7 +61,7 @@ impl From<&InstalledTapplet> for UpdateInstalledTapplet {
 #[derive(Debug, Serialize, FromRow)]
 pub struct Tapplet {
     pub id: Option<i32>,
-    pub tapp_registry_id: String,
+    pub package_name: String,
     pub display_name: String,
     pub logo_url: String,
     pub background_url: String,
@@ -74,7 +74,7 @@ pub struct Tapplet {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateTapplet {
-    pub tapp_registry_id: String,
+    pub package_name: String,
     pub display_name: String,
     pub logo_url: String,
     pub background_url: String,
@@ -88,7 +88,7 @@ pub struct CreateTapplet {
 impl From<&TappletRegistryManifest> for CreateTapplet {
     fn from(manifest: &TappletRegistryManifest) -> Self {
         CreateTapplet {
-            tapp_registry_id: manifest.id.clone(),
+            package_name: manifest.id.clone(),
             display_name: manifest.metadata.display_name.clone(),
             logo_url: manifest.metadata.logo_url.clone(),
             background_url: manifest.metadata.background_url.clone(),
@@ -103,7 +103,7 @@ impl From<&TappletRegistryManifest> for CreateTapplet {
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateTapplet {
-    pub tapp_registry_id: String,
+    pub package_name: String,
     pub display_name: String,
     pub logo_url: String,
     pub background_url: String,
@@ -117,7 +117,7 @@ pub struct UpdateTapplet {
 impl From<&CreateTapplet> for UpdateTapplet {
     fn from(create: &CreateTapplet) -> Self {
         UpdateTapplet {
-            tapp_registry_id: create.tapp_registry_id.clone(),
+            package_name: create.package_name.clone(),
             display_name: create.display_name.clone(),
             logo_url: create.logo_url.clone(),
             background_url: create.background_url.clone(),
