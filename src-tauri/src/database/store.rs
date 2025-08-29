@@ -1,601 +1,581 @@
-use diesel::prelude::*;
-use diesel::SqliteConnection;
-use std::ops::DerefMut;
+use sqlx::SqlitePool;
 use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::MutexGuard;
 
-use crate::database::models::TappletAudit;
-use crate::database::models::TappletVersion;
-use crate::database::models::{
-    CreateInstalledTapplet, CreateTapplet, InstalledTapplet, Tapplet, UpdateTapplet,
-};
+use crate::database::models::*;
 use crate::tapplets::error::{
     DatabaseError::*,
     Error::{self, DatabaseError},
 };
-use crate::tapplets::interface::InstalledTappletWithName;
-use crate::tapplets::interface::TappletSemver;
 
-use super::models::CreateDevTapplet;
-use super::models::CreateTappletAsset;
-use super::models::CreateTappletAudit;
-use super::models::CreateTappletVersion;
-use super::models::DevTapplet;
-use super::models::TappletAsset;
-use super::models::UpdateDevTapplet;
-use super::models::UpdateInstalledTapplet;
-use super::models::UpdateTappletAsset;
-use super::models::UpdateTappletAudit;
-use super::models::UpdateTappletVersion;
+#[derive(Clone)]
+pub struct DatabaseConnection(pub Arc<SqlitePool>);
 
-pub struct DatabaseConnection(pub Arc<Mutex<SqliteConnection>>);
-
+#[derive(Clone)]
 pub struct SqliteStore {
-    connection: Arc<Mutex<SqliteConnection>>,
+    pool: Arc<SqlitePool>,
 }
 
 impl SqliteStore {
-    pub fn new(connection: Arc<Mutex<SqliteConnection>>) -> Self {
-        Self { connection }
+    pub fn new(pool: Arc<SqlitePool>) -> Self {
+        Self { pool }
     }
 
-    pub fn get_connection(&self) -> MutexGuard<SqliteConnection> {
-        self.connection.lock().unwrap()
+    pub fn get_pool(&self) -> &SqlitePool {
+        &self.pool
     }
-}
 
-pub trait Store<T, U, G> {
-    fn get_all(&mut self) -> Result<Vec<T>, Error>;
-    fn get_by_id(&mut self, id: i32) -> Result<T, Error>;
-    fn create(&mut self, item: &U) -> Result<T, Error>;
-    fn delete(&mut self, entity: T) -> Result<usize, Error>;
-    fn update(&mut self, old: T, new: &G) -> Result<usize, Error>;
-}
-
-impl SqliteStore {
-    pub fn get_installed_tapplets_with_display_name(
-        &mut self,
-    ) -> Result<Vec<InstalledTappletWithName>, Error> {
-        use crate::database::schema::installed_tapplet::dsl::*;
-        use crate::database::schema::tapplet::dsl::*;
-        use crate::database::schema::tapplet_version::dsl::*;
-
-        let tapplets: Vec<(InstalledTapplet, Tapplet, TappletVersion)> = installed_tapplet
-            .inner_join(tapplet)
-            .inner_join(tapplet_version)
-            .select((
-                installed_tapplet::all_columns(),
-                tapplet::all_columns(),
-                tapplet_version::all_columns(),
-            ))
-            .load::<(InstalledTapplet, Tapplet, TappletVersion)>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "installed_tapplet".to_string(),
-                })
-            })?;
-
-        let result = tapplets
-            .into_iter()
-            .map(|(installed_tapp, tapp, tapp_version)| {
-                let (_registered_tapp, latest_version) = self
-                    .get_registered_tapplet_with_version(tapp.id.unwrap())
-                    .unwrap();
-
-                return InstalledTappletWithName {
-                    installed_tapplet: installed_tapp,
-                    display_name: tapp.display_name,
-                    installed_version: tapp_version.version,
-                    latest_version: latest_version.version,
-                };
+    // --- DevTapplet ---
+    pub async fn get_all_dev_tapplets(&self) -> Result<Vec<DevTapplet>, Error> {
+        sqlx::query_as::<_, DevTapplet>(
+            "SELECT id, package_name, source, display_name, csp, tari_permissions FROM dev_tapplet",
+        )
+        .fetch_all(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "dev_tapplet table".to_string(),
             })
-            .collect();
-
-        Ok(result)
+        })
     }
 
-    pub fn get_installed_tapplet_full_by_id(
-        &mut self,
-        installed_tapplet_id: i32,
-    ) -> Result<(InstalledTapplet, Tapplet, TappletVersion), Error> {
-        use crate::database::schema::installed_tapplet::dsl::id;
-        use crate::database::schema::installed_tapplet::dsl::*;
-        use crate::database::schema::tapplet::dsl::*;
-        use crate::database::schema::tapplet_version::dsl::*;
+    pub async fn get_dev_tapplet_by_id(&self, dev_tapplet_id: i32) -> Result<DevTapplet, Error> {
+        sqlx::query_as::<_, DevTapplet>(
+            "SELECT id, package_name, source, display_name, csp, tari_permissions FROM dev_tapplet WHERE id = ?"
+        )
+        .bind(dev_tapplet_id)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| DatabaseError(FailedToRetrieveData {
+            entity_name: "Dev Tapplet".to_string(),
+        }))
+    }
 
-        installed_tapplet
-            .filter(id.eq(installed_tapplet_id))
-            .inner_join(tapplet)
-            .inner_join(tapplet_version)
-            .select((
-                installed_tapplet::all_columns(),
-                tapplet::all_columns(),
-                tapplet_version::all_columns(),
-            ))
-            .first::<(InstalledTapplet, Tapplet, TappletVersion)>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "installed tapplet".to_string(),
-                })
+    pub async fn create_dev_tapplet(&self, item: &CreateDevTapplet) -> Result<DevTapplet, Error> {
+        sqlx::query_as::<_, DevTapplet>(
+            r#"
+            INSERT INTO dev_tapplet (package_name, source, display_name, csp, tari_permissions)
+            VALUES (?, ?, ?, ?, ?)
+            RETURNING id, package_name, source, display_name, csp, tari_permissions
+            "#,
+        )
+        .bind(&item.package_name)
+        .bind(&item.source)
+        .bind(&item.display_name)
+        .bind(&item.csp)
+        .bind(&item.tari_permissions)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToCreate {
+                entity_name: item.display_name.clone(),
             })
+        })
     }
 
-    pub fn get_registered_tapplet_with_version(
-        &mut self,
-        registered_tapplet_id: i32,
-    ) -> Result<(Tapplet, TappletVersion), Error> {
-        use crate::database::schema::tapplet::dsl::id;
-        use crate::database::schema::tapplet::dsl::*;
-        use crate::database::schema::tapplet_version::dsl::*;
-
-        let registered_tapplet = tapplet
-            .filter(id.eq(registered_tapplet_id))
-            .first::<Tapplet>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "tapplet".to_string(),
-                })
-            })?;
-
-        let versions: Vec<TappletVersion> = tapplet_version
-            .filter(tapplet_id.eq(registered_tapplet_id))
-            .load::<TappletVersion>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "tapplet version".to_string(),
-                })
-            })?;
-
-        let versions = versions
-            .into_iter()
-            .map(|tapp_version| TappletSemver::try_from(tapp_version))
-            .collect::<Result<Vec<TappletSemver>, Error>>()?;
-
-        let latest_version = versions
-            .into_iter()
-            .max_by_key(|ver| ver.semver.clone())
-            .ok_or(Error::VersionNotFound)?;
-
-        return Ok((registered_tapplet, latest_version.tapplet_version));
-    }
-
-    pub fn get_tapplet_assets_by_tapplet_id(
-        &mut self,
-        tapp_id: i32,
-    ) -> Result<Option<TappletAsset>, Error> {
-        use crate::database::schema::tapplet_asset::dsl::*;
-
-        tapplet_asset
-            .filter(tapplet_id.eq(tapp_id))
-            .first::<TappletAsset>(self.get_connection().deref_mut())
-            .optional()
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "tapplet asset".to_string(),
-                })
+    pub async fn update_dev_tapplet(&self, id: i32, item: &UpdateDevTapplet) -> Result<u64, Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE dev_tapplet SET
+                package_name = ?,
+                source = ?,
+                display_name = ?,
+                csp = ?,
+                tari_permissions = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(&item.package_name)
+        .bind(&item.source)
+        .bind(&item.display_name)
+        .bind(&item.csp)
+        .bind(&item.tari_permissions)
+        .bind(id)
+        .execute(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToUpdate {
+                entity_name: item.display_name.clone(),
             })
+        })?;
+        Ok(result.rows_affected())
     }
 
-    pub fn get_all_dev_tapplets(&mut self) -> Result<Vec<DevTapplet>, Error> {
-        use crate::database::schema::dev_tapplet::dsl::*;
-        dev_tapplet
-            .load::<DevTapplet>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "dev_tapplet table".to_string(),
-                })
-            })
-    }
-}
-
-impl<'a> Store<Tapplet, CreateTapplet<'a>, UpdateTapplet> for SqliteStore {
-    fn get_all(&mut self) -> Result<Vec<Tapplet>, Error> {
-        use crate::database::schema::tapplet::dsl::*;
-
-        tapplet
-            .load::<Tapplet>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "Tapplet".to_string(),
-                })
-            })
-    }
-
-    fn get_by_id(&mut self, tapplet_id: i32) -> Result<Tapplet, Error> {
-        use crate::database::schema::tapplet::dsl::*;
-
-        tapplet
-            .filter(id.eq(tapplet_id))
-            .first::<Tapplet>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "Tapplet".to_string(),
-                })
-            })
-    }
-
-    fn create(&mut self, item: &CreateTapplet) -> Result<Tapplet, Error> {
-        use crate::database::schema::tapplet;
-
-        diesel::insert_into(tapplet::table)
-            .values(item)
-            .on_conflict(tapplet::tapp_registry_id)
-            .do_update()
-            .set(UpdateTapplet::from(item))
-            .get_result(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToCreate {
-                    entity_name: item.display_name.to_string(),
-                })
-            })
-    }
-
-    fn delete(&mut self, entity: Tapplet) -> Result<usize, Error> {
-        use crate::database::schema::tapplet::dsl::*;
-
-        diesel::delete(tapplet.filter(id.eq(entity.id)))
-            .execute(self.get_connection().deref_mut())
+    pub async fn delete_dev_tapplet(&self, id: i32) -> Result<u64, Error> {
+        let result = sqlx::query("DELETE FROM dev_tapplet WHERE id = ?")
+            .bind(id)
+            .execute(self.get_pool())
+            .await
             .map_err(|_| {
                 DatabaseError(FailedToDelete {
-                    entity_name: entity.display_name.to_string(),
-                })
-            })
-    }
-
-    fn update(&mut self, old: Tapplet, new: &UpdateTapplet) -> Result<usize, Error> {
-        use crate::database::schema::tapplet::dsl::*;
-
-        diesel::update(tapplet.filter(id.eq(old.id)))
-            .set(new)
-            .execute(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToUpdate {
-                    entity_name: old.display_name.to_string(),
-                })
-            })
-    }
-}
-
-impl Store<InstalledTapplet, CreateInstalledTapplet, UpdateInstalledTapplet> for SqliteStore {
-    fn get_all(&mut self) -> Result<Vec<InstalledTapplet>, Error> {
-        use crate::database::schema::installed_tapplet::dsl::*;
-
-        installed_tapplet
-            .load::<InstalledTapplet>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "Installed Tapplet".to_string(),
-                })
-            })
-    }
-
-    fn get_by_id(&mut self, installed_tapplet_id: i32) -> Result<InstalledTapplet, Error> {
-        use crate::database::schema::installed_tapplet::dsl::*;
-
-        installed_tapplet
-            .filter(id.eq(installed_tapplet_id))
-            .first::<InstalledTapplet>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "installed Tapplet".to_string(),
-                })
-            })
-    }
-
-    fn create(&mut self, item: &CreateInstalledTapplet) -> Result<InstalledTapplet, Error> {
-        use crate::database::schema::installed_tapplet;
-        println!("try to add item {:?}", &item);
-        diesel::insert_into(installed_tapplet::table)
-            .values(item)
-            .on_conflict((
-                installed_tapplet::tapplet_id,
-                installed_tapplet::tapplet_version_id,
-                installed_tapplet::source,
-            ))
-            .do_update()
-            .set(UpdateInstalledTapplet::from(item))
-            .get_result(self.get_connection().deref_mut())
-            .map_err(|e| {
-                DatabaseError(FailedToCreate {
-                    entity_name: e.to_string(),
-                })
-            })
-    }
-
-    fn update(
-        &mut self,
-        old: InstalledTapplet,
-        new: &UpdateInstalledTapplet,
-    ) -> Result<usize, Error> {
-        use crate::database::schema::installed_tapplet::dsl::*;
-
-        diesel::update(installed_tapplet.filter(id.eq(old.id)))
-            .set(new)
-            .execute(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToUpdate {
-                    entity_name: "installed Tapplet".to_string(),
-                })
-            })
-    }
-
-    fn delete(&mut self, entity: InstalledTapplet) -> Result<usize, Error> {
-        use crate::database::schema::installed_tapplet::dsl::*;
-
-        diesel::delete(installed_tapplet.filter(id.eq(entity.id)))
-            .execute(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToDelete {
-                    entity_name: "installed Tapplet".to_string(),
-                })
-            })
-    }
-}
-
-impl<'a> Store<TappletVersion, CreateTappletVersion<'a>, UpdateTappletVersion> for SqliteStore {
-    fn get_all(&mut self) -> Result<Vec<TappletVersion>, Error> {
-        use crate::database::schema::tapplet_version::dsl::*;
-
-        tapplet_version
-            .load::<TappletVersion>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "Tapplet version".to_string(),
-                })
-            })
-    }
-
-    fn get_by_id(&mut self, tapplet_version_id: i32) -> Result<TappletVersion, Error> {
-        use crate::database::schema::tapplet_version::dsl::*;
-
-        tapplet_version
-            .filter(id.eq(tapplet_version_id))
-            .first::<TappletVersion>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "Tapplet version".to_string(),
-                })
-            })
-    }
-
-    fn create(&mut self, item: &CreateTappletVersion) -> Result<TappletVersion, Error> {
-        use crate::database::schema::tapplet_version;
-
-        diesel::insert_into(tapplet_version::table)
-            .values(item)
-            .on_conflict((tapplet_version::version, tapplet_version::tapplet_id))
-            .do_update()
-            .set(UpdateTappletVersion::from(item))
-            .get_result(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToCreate {
-                    entity_name: "Tapplet version".to_string(),
-                })
-            })
-    }
-
-    fn update(&mut self, old: TappletVersion, new: &UpdateTappletVersion) -> Result<usize, Error> {
-        use crate::database::schema::tapplet_version::dsl::*;
-
-        diesel::update(tapplet_version.filter(id.eq(old.id)))
-            .set(new)
-            .execute(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToUpdate {
-                    entity_name: "Tapplet version".to_string(),
-                })
-            })
-    }
-
-    fn delete(&mut self, entity: TappletVersion) -> Result<usize, Error> {
-        use crate::database::schema::tapplet_version::dsl::*;
-
-        diesel::delete(tapplet_version.filter(id.eq(entity.id)))
-            .execute(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToDelete {
-                    entity_name: "Tapplet version".to_string(),
-                })
-            })
-    }
-}
-
-impl<'a> Store<TappletAudit, CreateTappletAudit<'a>, UpdateTappletAudit> for SqliteStore {
-    fn get_all(&mut self) -> Result<Vec<TappletAudit>, Error> {
-        use crate::database::schema::tapplet_audit::dsl::*;
-
-        tapplet_audit
-            .load::<TappletAudit>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "Tapplet audit".to_string(),
-                })
-            })
-    }
-
-    fn get_by_id(&mut self, tapplet_audit_id: i32) -> Result<TappletAudit, Error> {
-        use crate::database::schema::tapplet_audit::dsl::*;
-
-        tapplet_audit
-            .filter(id.eq(tapplet_audit_id))
-            .first::<TappletAudit>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "Tapplet audit".to_string(),
-                })
-            })
-    }
-
-    fn create(&mut self, item: &CreateTappletAudit) -> Result<TappletAudit, Error> {
-        use crate::database::schema::tapplet_audit;
-
-        diesel::insert_into(tapplet_audit::table)
-            .values(item)
-            .on_conflict((tapplet_audit::auditor, tapplet_audit::tapplet_id))
-            .do_update()
-            .set(UpdateTappletAudit::from(item))
-            .get_result(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToCreate {
-                    entity_name: "Tapplet audit".to_string(),
-                })
-            })
-    }
-
-    fn update(&mut self, old: TappletAudit, new: &UpdateTappletAudit) -> Result<usize, Error> {
-        use crate::database::schema::tapplet_audit::dsl::*;
-
-        diesel::update(tapplet_audit.filter(id.eq(old.id)))
-            .set(new)
-            .execute(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToUpdate {
-                    entity_name: "Tapplet audit".to_string(),
-                })
-            })
-    }
-
-    fn delete(&mut self, entity: TappletAudit) -> Result<usize, Error> {
-        use crate::database::schema::tapplet_audit::dsl::*;
-
-        diesel::delete(tapplet_audit.filter(id.eq(entity.id)))
-            .execute(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToDelete {
-                    entity_name: "Tapplet audit".to_string(),
-                })
-            })
-    }
-}
-
-impl<'a> Store<DevTapplet, CreateDevTapplet<'a>, UpdateDevTapplet> for SqliteStore {
-    fn get_all(&mut self) -> Result<Vec<DevTapplet>, Error> {
-        use crate::database::schema::dev_tapplet::dsl::*;
-
-        dev_tapplet
-            .load::<DevTapplet>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
                     entity_name: "Dev Tapplet".to_string(),
                 })
-            })
+            })?;
+        Ok(result.rows_affected())
     }
 
-    fn get_by_id(&mut self, dev_tapplet_id: i32) -> Result<DevTapplet, Error> {
-        use crate::database::schema::dev_tapplet::dsl::*;
-
-        dev_tapplet
-            .filter(id.eq(dev_tapplet_id))
-            .first::<DevTapplet>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "Dev Tapplet".to_string(),
-                })
-            })
+    // --- Tapplet ---
+    pub async fn get_all_tapplets(&self) -> Result<Vec<Tapplet>, Error> {
+        sqlx::query_as::<_, Tapplet>(
+            "SELECT id, tapp_registry_id, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category FROM tapplet"
+        )
+        .fetch_all(self.get_pool())
+        .await
+        .map_err(|_| DatabaseError(FailedToRetrieveData {
+            entity_name: "Tapplet".to_string(),
+        }))
     }
 
-    fn create(&mut self, item: &CreateDevTapplet) -> Result<DevTapplet, Error> {
-        use crate::database::schema::dev_tapplet;
-
-        diesel::insert_into(dev_tapplet::table)
-            .values(item)
-            .get_result(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(AlreadyExists {
-                    entity_name: item.display_name.to_string(),
-                    field_name: "field name".to_string(),
-                })
-            })
+    pub async fn get_tapplet_by_id(&self, tapplet_id: i32) -> Result<Tapplet, Error> {
+        sqlx::query_as::<_, Tapplet>(
+            "SELECT id, tapp_registry_id, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category FROM tapplet WHERE id = ?"
+        )
+        .bind(tapplet_id)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| DatabaseError(FailedToRetrieveData {
+            entity_name: "Tapplet".to_string(),
+        }))
     }
 
-    fn update(&mut self, old: DevTapplet, new: &UpdateDevTapplet) -> Result<usize, Error> {
-        use crate::database::schema::dev_tapplet::dsl::*;
-
-        diesel::update(dev_tapplet.filter(id.eq(old.id)))
-            .set(new)
-            .execute(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToUpdate {
-                    entity_name: old.display_name.to_string(),
-                })
-            })
+    pub async fn create_tapplet(&self, item: &CreateTapplet) -> Result<Tapplet, Error> {
+        sqlx::query_as::<_, Tapplet>(
+            r#"
+            INSERT INTO tapplet (tapp_registry_id, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id, tapp_registry_id, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category
+            "#
+        )
+        .bind(&item.tapp_registry_id)
+        .bind(&item.display_name)
+        .bind(&item.logo_url)
+        .bind(&item.background_url)
+        .bind(&item.author_name)
+        .bind(&item.author_website)
+        .bind(&item.about_summary)
+        .bind(&item.about_description)
+        .bind(&item.category)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| DatabaseError(FailedToCreate {
+            entity_name: item.display_name.clone(),
+        }))
     }
 
-    fn delete(&mut self, entity: DevTapplet) -> Result<usize, Error> {
-        use crate::database::schema::dev_tapplet::dsl::*;
-
-        diesel::delete(dev_tapplet.filter(id.eq(entity.id)))
-            .execute(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToDelete {
-                    entity_name: entity.display_name.to_string(),
-                })
+    pub async fn update_tapplet(&self, id: i32, item: &UpdateTapplet) -> Result<u64, Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE tapplet SET
+                tapp_registry_id = ?,
+                display_name = ?,
+                logo_url = ?,
+                background_url = ?,
+                author_name = ?,
+                author_website = ?,
+                about_summary = ?,
+                about_description = ?,
+                category = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(&item.tapp_registry_id)
+        .bind(&item.display_name)
+        .bind(&item.logo_url)
+        .bind(&item.background_url)
+        .bind(&item.author_name)
+        .bind(&item.author_website)
+        .bind(&item.about_summary)
+        .bind(&item.about_description)
+        .bind(&item.category)
+        .bind(id)
+        .execute(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToUpdate {
+                entity_name: item.display_name.clone(),
             })
-    }
-}
-
-impl<'a> Store<TappletAsset, CreateTappletAsset<'a>, UpdateTappletAsset> for SqliteStore {
-    fn get_all(&mut self) -> Result<Vec<TappletAsset>, Error> {
-        use crate::database::schema::tapplet_asset::dsl::*;
-
-        tapplet_asset
-            .load::<TappletAsset>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "Tapplet asset".to_string(),
-                })
-            })
-    }
-
-    fn get_by_id(&mut self, tapplet_asset_id: i32) -> Result<TappletAsset, Error> {
-        use crate::database::schema::tapplet_asset::dsl::*;
-
-        tapplet_asset
-            .filter(id.eq(tapplet_asset_id))
-            .first::<TappletAsset>(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToRetrieveData {
-                    entity_name: "Tapplet asset".to_string(),
-                })
-            })
+        })?;
+        Ok(result.rows_affected())
     }
 
-    fn create(&mut self, item: &CreateTappletAsset) -> Result<TappletAsset, Error> {
-        use crate::database::schema::tapplet_asset;
-
-        diesel::insert_into(tapplet_asset::table)
-            .values(item)
-            .get_result(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToCreate {
-                    entity_name: "Tapplet asset".to_string(),
-                })
-            })
-    }
-
-    fn update(&mut self, old: TappletAsset, new: &UpdateTappletAsset) -> Result<usize, Error> {
-        use crate::database::schema::tapplet_asset::dsl::*;
-
-        diesel::update(tapplet_asset.filter(id.eq(old.id)))
-            .set(new)
-            .execute(self.get_connection().deref_mut())
-            .map_err(|_| {
-                DatabaseError(FailedToUpdate {
-                    entity_name: "Tapplet asset".to_string(),
-                })
-            })
-    }
-
-    fn delete(&mut self, entity: TappletAsset) -> Result<usize, Error> {
-        use crate::database::schema::tapplet_asset::dsl::*;
-
-        diesel::delete(tapplet_asset.filter(id.eq(entity.id)))
-            .execute(self.get_connection().deref_mut())
+    pub async fn delete_tapplet(&self, id: i32) -> Result<u64, Error> {
+        let result = sqlx::query("DELETE FROM tapplet WHERE id = ?")
+            .bind(id)
+            .execute(self.get_pool())
+            .await
             .map_err(|_| {
                 DatabaseError(FailedToDelete {
-                    entity_name: "Tapplet asset".to_string(),
+                    entity_name: "Tapplet".to_string(),
                 })
+            })?;
+        Ok(result.rows_affected())
+    }
+
+    // --- InstalledTapplet ---
+    pub async fn get_all_installed_tapplets(&self) -> Result<Vec<InstalledTapplet>, Error> {
+        sqlx::query_as::<_, InstalledTapplet>(
+            "SELECT id, tapplet_id, tapplet_version_id, source, csp, tari_permissions FROM installed_tapplet"
+        )
+        .fetch_all(self.get_pool())
+        .await
+        .map_err(|_| DatabaseError(FailedToRetrieveData {
+            entity_name: "InstalledTapplet".to_string(),
+        }))
+    }
+
+    pub async fn get_installed_tapplet_by_id(&self, id: i32) -> Result<InstalledTapplet, Error> {
+        sqlx::query_as::<_, InstalledTapplet>(
+            "SELECT id, tapplet_id, tapplet_version_id, source, csp, tari_permissions FROM installed_tapplet WHERE id = ?"
+        )
+        .bind(id)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| DatabaseError(FailedToRetrieveData {
+            entity_name: "InstalledTapplet".to_string(),
+        }))
+    }
+
+    pub async fn create_installed_tapplet(
+        &self,
+        item: &CreateInstalledTapplet,
+    ) -> Result<InstalledTapplet, Error> {
+        sqlx::query_as::<_, InstalledTapplet>(
+            r#"
+            INSERT INTO installed_tapplet (tapplet_id, tapplet_version_id, source, csp, tari_permissions)
+            VALUES (?, ?, ?, ?, ?)
+            RETURNING id, tapplet_id, tapplet_version_id, source, csp, tari_permissions
+            "#
+        )
+        .bind(item.tapplet_id)
+        .bind(item.tapplet_version_id)
+        .bind(&item.source)
+        .bind(&item.csp)
+        .bind(&item.tari_permissions)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| DatabaseError(FailedToCreate {
+            entity_name: "InstalledTapplet".to_string(),
+        }))
+    }
+
+    pub async fn update_installed_tapplet(
+        &self,
+        id: i32,
+        item: &UpdateInstalledTapplet,
+    ) -> Result<u64, Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE installed_tapplet SET
+                tapplet_id = ?,
+                tapplet_version_id = ?,
+                source = ?,
+                csp = ?,
+                tari_permissions = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(item.tapplet_id)
+        .bind(item.tapplet_version_id)
+        .bind(&item.source)
+        .bind(&item.csp)
+        .bind(&item.tari_permissions)
+        .bind(id)
+        .execute(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToUpdate {
+                entity_name: "InstalledTapplet".to_string(),
             })
+        })?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn delete_installed_tapplet(&self, id: i32) -> Result<u64, Error> {
+        let result = sqlx::query("DELETE FROM installed_tapplet WHERE id = ?")
+            .bind(id)
+            .execute(self.get_pool())
+            .await
+            .map_err(|_| {
+                DatabaseError(FailedToDelete {
+                    entity_name: "InstalledTapplet".to_string(),
+                })
+            })?;
+        Ok(result.rows_affected())
+    }
+
+    // --- TappletVersion ---
+    pub async fn get_all_tapplet_versions(&self) -> Result<Vec<TappletVersion>, Error> {
+        sqlx::query_as::<_, TappletVersion>(
+            "SELECT id, tapplet_id, version, integrity, registry_url FROM tapplet_version",
+        )
+        .fetch_all(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "TappletVersion".to_string(),
+            })
+        })
+    }
+
+    pub async fn get_tapplet_version_by_id(&self, id: i32) -> Result<TappletVersion, Error> {
+        sqlx::query_as::<_, TappletVersion>(
+            "SELECT id, tapplet_id, version, integrity, registry_url FROM tapplet_version WHERE id = ?"
+        )
+        .bind(id)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| DatabaseError(FailedToRetrieveData {
+            entity_name: "TappletVersion".to_string(),
+        }))
+    }
+
+    pub async fn create_tapplet_version(
+        &self,
+        item: &CreateTappletVersion,
+    ) -> Result<TappletVersion, Error> {
+        sqlx::query_as::<_, TappletVersion>(
+            r#"
+            INSERT INTO tapplet_version (tapplet_id, version, integrity, registry_url)
+            VALUES (?, ?, ?, ?)
+            RETURNING id, tapplet_id, version, integrity, registry_url
+            "#,
+        )
+        .bind(item.tapplet_id)
+        .bind(&item.version)
+        .bind(&item.integrity)
+        .bind(&item.registry_url)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToCreate {
+                entity_name: "TappletVersion".to_string(),
+            })
+        })
+    }
+
+    pub async fn update_tapplet_version(
+        &self,
+        id: i32,
+        item: &UpdateTappletVersion,
+    ) -> Result<u64, Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE tapplet_version SET
+                tapplet_id = ?,
+                version = ?,
+                integrity = ?,
+                registry_url = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(item.tapplet_id)
+        .bind(&item.version)
+        .bind(&item.integrity)
+        .bind(&item.registry_url)
+        .bind(id)
+        .execute(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToUpdate {
+                entity_name: "TappletVersion".to_string(),
+            })
+        })?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn delete_tapplet_version(&self, id: i32) -> Result<u64, Error> {
+        let result = sqlx::query("DELETE FROM tapplet_version WHERE id = ?")
+            .bind(id)
+            .execute(self.get_pool())
+            .await
+            .map_err(|_| {
+                DatabaseError(FailedToDelete {
+                    entity_name: "TappletVersion".to_string(),
+                })
+            })?;
+        Ok(result.rows_affected())
+    }
+
+    // --- TappletAudit ---
+    pub async fn get_all_tapplet_audits(&self) -> Result<Vec<TappletAudit>, Error> {
+        sqlx::query_as::<_, TappletAudit>(
+            "SELECT id, tapplet_id, auditor, report_url FROM tapplet_audit",
+        )
+        .fetch_all(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "TappletAudit".to_string(),
+            })
+        })
+    }
+
+    pub async fn get_tapplet_audit_by_id(&self, id: i32) -> Result<TappletAudit, Error> {
+        sqlx::query_as::<_, TappletAudit>(
+            "SELECT id, tapplet_id, auditor, report_url FROM tapplet_audit WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "TappletAudit".to_string(),
+            })
+        })
+    }
+
+    pub async fn create_tapplet_audit(
+        &self,
+        item: &CreateTappletAudit,
+    ) -> Result<TappletAudit, Error> {
+        sqlx::query_as::<_, TappletAudit>(
+            r#"
+            INSERT INTO tapplet_audit (tapplet_id, auditor, report_url)
+            VALUES (?, ?, ?)
+            RETURNING id, tapplet_id, auditor, report_url
+            "#,
+        )
+        .bind(item.tapplet_id)
+        .bind(&item.auditor)
+        .bind(&item.report_url)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToCreate {
+                entity_name: "TappletAudit".to_string(),
+            })
+        })
+    }
+
+    pub async fn update_tapplet_audit(
+        &self,
+        id: i32,
+        item: &UpdateTappletAudit,
+    ) -> Result<u64, Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE tapplet_audit SET
+                tapplet_id = ?,
+                auditor = ?,
+                report_url = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(item.tapplet_id)
+        .bind(&item.auditor)
+        .bind(&item.report_url)
+        .bind(id)
+        .execute(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToUpdate {
+                entity_name: "TappletAudit".to_string(),
+            })
+        })?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn delete_tapplet_audit(&self, id: i32) -> Result<u64, Error> {
+        let result = sqlx::query("DELETE FROM tapplet_audit WHERE id = ?")
+            .bind(id)
+            .execute(self.get_pool())
+            .await
+            .map_err(|_| {
+                DatabaseError(FailedToDelete {
+                    entity_name: "TappletAudit".to_string(),
+                })
+            })?;
+        Ok(result.rows_affected())
+    }
+
+    // --- TappletAsset ---
+    pub async fn get_all_tapplet_assets(&self) -> Result<Vec<TappletAsset>, Error> {
+        sqlx::query_as::<_, TappletAsset>(
+            "SELECT id, tapplet_id, icon_url, background_url FROM tapplet_asset",
+        )
+        .fetch_all(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "TappletAsset".to_string(),
+            })
+        })
+    }
+
+    pub async fn get_tapplet_asset_by_id(&self, id: i32) -> Result<TappletAsset, Error> {
+        sqlx::query_as::<_, TappletAsset>(
+            "SELECT id, tapplet_id, icon_url, background_url FROM tapplet_asset WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "TappletAsset".to_string(),
+            })
+        })
+    }
+
+    pub async fn create_tapplet_asset(
+        &self,
+        item: &CreateTappletAsset,
+    ) -> Result<TappletAsset, Error> {
+        sqlx::query_as::<_, TappletAsset>(
+            r#"
+            INSERT INTO tapplet_asset (tapplet_id, icon_url, background_url)
+            VALUES (?, ?, ?)
+            RETURNING id, tapplet_id, icon_url, background_url
+            "#,
+        )
+        .bind(item.tapplet_id)
+        .bind(&item.icon_url)
+        .bind(&item.background_url)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToCreate {
+                entity_name: "TappletAsset".to_string(),
+            })
+        })
+    }
+
+    pub async fn update_tapplet_asset(
+        &self,
+        id: i32,
+        item: &UpdateTappletAsset,
+    ) -> Result<u64, Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE tapplet_asset SET
+                tapplet_id = ?,
+                icon_url = ?,
+                background_url = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(item.tapplet_id)
+        .bind(&item.icon_url)
+        .bind(&item.background_url)
+        .bind(id)
+        .execute(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToUpdate {
+                entity_name: "TappletAsset".to_string(),
+            })
+        })?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn delete_tapplet_asset(&self, id: i32) -> Result<u64, Error> {
+        let result = sqlx::query("DELETE FROM tapplet_asset WHERE id = ?")
+            .bind(id)
+            .execute(self.get_pool())
+            .await
+            .map_err(|_| {
+                DatabaseError(FailedToDelete {
+                    entity_name: "TappletAsset".to_string(),
+                })
+            })?;
+        Ok(result.rows_affected())
     }
 }
