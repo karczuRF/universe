@@ -452,7 +452,10 @@ fn main() {
                 .app_data_dir()
                 .expect("Could not get app data dir");
             let db_path = app_data_dir.join(DB_FILE_NAME);
-            let pool = database::establish_connection(db_path.to_str().unwrap_or_default()).await;
+            // TODO db establish connection
+            let pool = block_on(database::establish_connection(
+                &db_path.to_str().expect("Could not get db path"),
+            ));
             app.manage(DatabaseConnection(Arc::new(pool)));
             app.manage(tapplet_manager);
 
