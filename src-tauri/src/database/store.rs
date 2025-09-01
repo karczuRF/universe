@@ -6,7 +6,9 @@ use crate::tapplets::error::{
     DatabaseError::*,
     Error::{self, DatabaseError},
 };
-use crate::tapplets::interface::TappletSemver;
+use crate::tapplets::interface::{
+    InstalledTappletJoinRow, InstalledTappletWithName, TappletSemver,
+};
 
 #[derive(Clone)]
 pub struct DatabaseConnection(pub Arc<SqlitePool>);
@@ -675,5 +677,99 @@ impl SqliteStore {
             .ok_or(Error::VersionNotFound)?;
 
         Ok((registered_tapplet, latest_version.tapplet_version))
+    }
+
+    pub async fn get_installed_tapplets_with_display_name(
+        &self,
+    ) -> Result<Vec<InstalledTappletWithName>, Error> {
+        let rows = sqlx::query_as::<_, InstalledTappletJoinRow>(
+        r#"
+        SELECT 
+            it.id as it_id, it.tapplet_id as it_tapplet_id, it.tapplet_version_id as it_tapplet_version_id, it.source as it_source, it.csp as it_csp, it.tari_permissions as it_tari_permissions,
+            t.id as t_id, t.package_name as t_package_name, t.display_name as t_display_name, t.logo_url as t_logo_url, t.background_url as t_background_url, t.author_name as t_author_name, t.author_website as t_author_website, t.about_summary as t_about_summary, t.about_description as t_about_description, t.category as t_category,
+            tv.id as tv_id, tv.tapplet_id as tv_tapplet_id, tv.version as tv_version, tv.integrity as tv_integrity, tv.registry_url as tv_registry_url
+        FROM installed_tapplet it
+        INNER JOIN tapplet t ON it.tapplet_id = t.id
+        INNER JOIN tapplet_version tv ON it.tapplet_version_id = tv.id
+        "#
+    )
+    .fetch_all(self.get_pool())
+    .await
+    .map_err(|_| DatabaseError(FailedToRetrieveData {
+        entity_name: "installed_tapplet".to_string(),
+    }))?;
+
+        let mut result = Vec::new();
+
+        for row in rows {
+            let installed_tapplet = InstalledTapplet {
+                id: row.it_id,
+                tapplet_id: row.it_tapplet_id,
+                tapplet_version_id: row.it_tapplet_version_id,
+                source: row.it_source,
+                csp: row.it_csp,
+                tari_permissions: row.it_tari_permissions,
+            };
+
+            let tapp = Tapplet {
+                id: row.t_id,
+                package_name: row.t_package_name,
+                display_name: row.t_display_name.clone(),
+                logo_url: row.t_logo_url,
+                background_url: row.t_background_url,
+                author_name: row.t_author_name,
+                author_website: row.t_author_website,
+                about_summary: row.t_about_summary,
+                about_description: row.t_about_description,
+                category: row.t_category,
+            };
+
+            let tapp_version = TappletVersion {
+                id: row.tv_id,
+                tapplet_id: row.tv_tapplet_id,
+                version: row.tv_version.clone(),
+                integrity: row.tv_integrity,
+                registry_url: row.tv_registry_url,
+            };
+
+            let (_registered_tapp, latest_version) = self
+                .get_registered_tapplet_with_version(tapp.id.unwrap())
+                .await?;
+
+            result.push(InstalledTappletWithName {
+                installed_tapplet,
+                display_name: tapp.display_name,
+                installed_version: tapp_version.version,
+                latest_version: latest_version.version,
+            });
+        }
+
+        Ok(result)
+    }
+
+    /// Get (package_name, version) for an installed_tapplet_id directly from the DB with a join query.
+    pub async fn get_installed_tapplet_package_and_version_query(
+        &self,
+        installed_tapplet_id: i32,
+    ) -> Result<(String, String), Error> {
+        let row = sqlx::query_as::<_, (String, String)>(
+            r#"
+        SELECT t.package_name, tv.version
+        FROM installed_tapplet it
+        INNER JOIN tapplet t ON it.tapplet_id = t.id
+        INNER JOIN tapplet_version tv ON it.tapplet_version_id = tv.id
+        WHERE it.id = ?
+        "#,
+        )
+        .bind(installed_tapplet_id)
+        .fetch_one(self.get_pool())
+        .await
+        .map_err(|_| {
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "installed_tapplet/tapplet/tapplet_version".to_string(),
+            })
+        })?;
+
+        Ok(row)
     }
 }

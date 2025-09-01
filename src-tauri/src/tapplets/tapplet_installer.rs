@@ -50,7 +50,7 @@ pub fn check_extracted_files(tapplet_path: PathBuf) -> Result<bool, Error> {
 }
 
 pub fn get_tapp_download_path(
-    registry_id: String,
+    package_name: String,
     version: String,
     app_handle: tauri::AppHandle,
 ) -> Result<PathBuf, Error> {
@@ -62,7 +62,7 @@ pub fn get_tapp_download_path(
 
     let tapplet_path = app_path
         .join(TAPPLETS_INSTALLED_DIR)
-        .join(registry_id)
+        .join(package_name)
         .join(version);
 
     Ok(tapplet_path)
