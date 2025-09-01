@@ -491,17 +491,22 @@ pub async fn read_installed_tapp_db(
 
 #[tauri::command]
 pub async fn update_installed_tapp_db(
-    tapplet: UpdateInstalledTapplet,
+   tapplet_id: i32,
     db_connection: tauri::State<'_, DatabaseConnection>,
-) -> Result<u64, Error> {
+) -> Result<u64, InvokeError> {
     // TODO
-    // let mut tapplet_store = SqliteStore::new(db_connection.0.clone());
-    // let tapplets: Vec<InstalledTapplet> = tapplet_store.get_all_installed_tapplets()?;
-    // let first: InstalledTapplet = tapplets.into_iter().next().unwrap();
-    // tapplet_store
-    //     .update_installed_tapplet(tapplet.tapplet_id, &tapplet)
-    //     .await
-    return Ok(0);
+    let store = SqliteStore::new(db_connection.0.clone());
+    let tapplets= store.get_all_installed_tapplets()        .await
+        .map_err(|e| InvokeError::from_error(e))?;
+
+    //get the newest tapplet version
+    let updated: InstalledTapplet = tapplets.into_iter().next().unwrap();
+    store
+        .update_installed_tapplet(tapplet_id, &UpdateInstalledTapplet { tapplet_id: updated.tapplet_id, tapplet_version_id: updated.tapplet_version_id, 
+            source: updated.source, csp: updated.csp, tari_permissions: updated.tari_permissions })
+               .await
+        .map_err(|e| InvokeError::from_error(e))
+
 }
 
 #[tauri::command]
@@ -513,7 +518,7 @@ pub async fn delete_installed_tapplet(
 ) -> Result<u64, InvokeError> {
     let store = SqliteStore::new(db_connection.0.clone());
         let (package_name, version) = store
-        .get_installed_tapplet_package_and_version_query(tapplet_id)
+        .get_installed_tapplet_package_and_version(tapplet_id)
         .await
         .map_err(|e| InvokeError::from_error(e))?;
 

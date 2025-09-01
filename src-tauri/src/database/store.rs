@@ -748,7 +748,7 @@ impl SqliteStore {
     }
 
     /// Get (package_name, version) for an installed_tapplet_id directly from the DB with a join query.
-    pub async fn get_installed_tapplet_package_and_version_query(
+    pub async fn get_installed_tapplet_package_and_version(
         &self,
         installed_tapplet_id: i32,
     ) -> Result<(String, String), Error> {
