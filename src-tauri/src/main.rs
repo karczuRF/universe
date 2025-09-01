@@ -688,7 +688,6 @@ fn main() {
             tapplet_commands::get_assets_server_addr,
             tapplet_commands::download_and_extract_tapp,
             tapplet_commands::read_installed_tapp_db,
-            tapplet_commands::update_installed_tapp_db,
             tapplet_commands::delete_installed_tapplet,
             tapplet_commands::add_dev_tapplet,
             tapplet_commands::read_dev_tapplets_db,

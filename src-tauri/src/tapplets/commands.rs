@@ -399,8 +399,8 @@ pub fn get_assets_server_addr(state: tauri::State<'_, AssetServer>) -> String {
 #[tauri::command]
 pub async fn download_and_extract_tapp(
     tapplet_id: i32,
-    db_connection: tauri::State<'_, DatabaseConnection>,
     app: tauri::AppHandle,
+    db_connection: tauri::State<'_, DatabaseConnection>,
     tapplet_manager: tauri::State<'_, TappletManager>,
 ) -> Result<InstalledTappletWithAssets, InvokeError> {
     let tapplet_store = SqliteStore::new(db_connection.0.clone());
@@ -483,30 +483,10 @@ pub async fn read_installed_tapp_db(
     db_connection: tauri::State<'_, DatabaseConnection>,
 ) -> Result<Vec<InstalledTappletWithName>, InvokeError> {
     let store = SqliteStore::new(db_connection.0.clone());
-      store
+    store
         .get_installed_tapplets_with_display_name()
         .await
         .map_err(|e| InvokeError::from_error(e))
-}
-
-#[tauri::command]
-pub async fn update_installed_tapp_db(
-   tapplet_id: i32,
-    db_connection: tauri::State<'_, DatabaseConnection>,
-) -> Result<u64, InvokeError> {
-    // TODO
-    let store = SqliteStore::new(db_connection.0.clone());
-    let tapplets= store.get_all_installed_tapplets()        .await
-        .map_err(|e| InvokeError::from_error(e))?;
-
-    //get the newest tapplet version
-    let updated: InstalledTapplet = tapplets.into_iter().next().unwrap();
-    store
-        .update_installed_tapplet(tapplet_id, &UpdateInstalledTapplet { tapplet_id: updated.tapplet_id, tapplet_version_id: updated.tapplet_version_id, 
-            source: updated.source, csp: updated.csp, tari_permissions: updated.tari_permissions })
-               .await
-        .map_err(|e| InvokeError::from_error(e))
-
 }
 
 #[tauri::command]
@@ -517,27 +497,20 @@ pub async fn delete_installed_tapplet(
     tapplet_manager: tauri::State<'_, TappletManager>,
 ) -> Result<u64, InvokeError> {
     let store = SqliteStore::new(db_connection.0.clone());
-        let (package_name, version) = store
+    let (package_name, version) = store
         .get_installed_tapplet_package_and_version(tapplet_id)
         .await
         .map_err(|e| InvokeError::from_error(e))?;
 
     let _ = stop_tapplet(tapplet_id, tapplet_manager).await;
 
-    let tapplet_path = get_tapp_download_path(
-        package_name,
-        version,
-        app_handle,
-    )
-            
+    let tapplet_path = get_tapp_download_path(package_name, version, app_handle)
         .map_err(|e| InvokeError::from_error(e))?;
     delete_tapplet_folder(tapplet_path)?;
 
     store
         .delete_installed_tapplet(tapplet_id)
         .await
-            
- 
         .map_err(|e| {
             warn!(target: LOG_TARGET, "❌ Error while deleting tapplet id {:?} from db: {:?}", tapplet_id, e);
             InvokeError::from_error(e)
@@ -554,9 +527,9 @@ pub async fn update_installed_tapplet(
 ) -> Result<Vec<InstalledTappletWithName>, InvokeError> {
     let _ = delete_installed_tapplet(
         installed_tapplet_id,
-        app_handle,
+        app_handle.clone(),
         db_connection.clone(),
-        tapplet_manager,
+        tapplet_manager.clone(),
     )
     .await
     .inspect_err(|e| {
@@ -566,21 +539,20 @@ pub async fn update_installed_tapplet(
         )
     });
 
-    // TODO
-    // let _ = download_and_extract_tapp(tapplet_id, db_connection.clone(), app_handle.clone())
-    //     .await
-    //     .inspect_err(|e| error!("❌ Download and extract tapplet process error: {:?}", e));
+    let _ = download_and_extract_tapp(
+        tapplet_id,
+        app_handle.clone(),
+        db_connection.clone(),
+        tapplet_manager.clone(),
+    )
+    .await
+    .inspect_err(|e| error!("❌ Download and extract tapplet process error: {:?}", e))?;
 
-    // let _ = insert_installed_tapp_db(tapplet_id, db_connection.clone())
-    //     .inspect_err(|e| error!("❌ Insert installed tapplet to db error: {:?}", e));
-
-    // TODO DB ADD
-    let mut store = SqliteStore::new(db_connection.0.clone());
-      store
+    let store = SqliteStore::new(db_connection.0.clone());
+    store
         .get_installed_tapplets_with_display_name()
         .await
         .map_err(|e| InvokeError::from_error(e))
-
 }
 
 #[tauri::command]
@@ -604,7 +576,9 @@ pub async fn add_dev_tapplet(
         tari_permissions: "requiredPermissions:[], optionalPermissions:[]".to_string(), //set default permissions and then ask to allow from config
     };
 
-        store.create_dev_tapplet(&new_dev_tapplet).await
+    store
+        .create_dev_tapplet(&new_dev_tapplet)
+        .await
         .map_err(|e| {
             warn!(target: LOG_TARGET, "❌ Error while adding dev tapplet to db: {:?}", e);
             InvokeError::from_error(e)
