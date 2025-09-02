@@ -9,7 +9,8 @@ use crate::tapplets::error::{
 use crate::tapplets::interface::{
     InstalledTappletJoinRow, InstalledTappletWithName, TappletSemver,
 };
-
+use log::{error, info};
+const LOG_TARGET: &str = "tari::universe::database";
 #[derive(Clone)]
 pub struct DatabaseConnection(pub Arc<SqlitePool>);
 
@@ -34,9 +35,10 @@ impl SqliteStore {
         )
         .fetch_all(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error: {e:?}");
             DatabaseError(FailedToRetrieveData {
-                entity_name: "dev_tapplet table".to_string(),
+                entity_name: "dev_tapplet".to_string(),
             })
         })
     }
@@ -48,9 +50,12 @@ impl SqliteStore {
         .bind(dev_tapplet_id)
         .fetch_one(self.get_pool())
         .await
-        .map_err(|_| DatabaseError(FailedToRetrieveData {
-            entity_name: "Dev Tapplet".to_string(),
-        }))
+.map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error: {e:?}");
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "dev_tapplet".to_string(),
+            })
+        })
     }
 
     pub async fn create_dev_tapplet(&self, item: &CreateDevTapplet) -> Result<DevTapplet, Error> {
@@ -68,9 +73,10 @@ impl SqliteStore {
         .bind(&item.tari_permissions)
         .fetch_one(self.get_pool())
         .await
-        .map_err(|_| {
-            DatabaseError(FailedToCreate {
-                entity_name: item.display_name.clone(),
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error: {e:?}");
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "dev_tapplet".to_string(),
             })
         })
     }
@@ -123,9 +129,12 @@ impl SqliteStore {
         )
         .fetch_all(self.get_pool())
         .await
-        .map_err(|_| DatabaseError(FailedToRetrieveData {
-            entity_name: "Tapplet".to_string(),
-        }))
+.map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error: {e:?}");
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "tapplet".to_string(),
+            })
+        })
     }
 
     pub async fn get_tapplet_by_id(&self, tapplet_id: i32) -> Result<Tapplet, Error> {
@@ -141,27 +150,50 @@ impl SqliteStore {
     }
 
     pub async fn create_tapplet(&self, item: &CreateTapplet) -> Result<Tapplet, Error> {
-        sqlx::query_as::<_, Tapplet>(
-            r#"
-            INSERT INTO tapplet (package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id, package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category
-            "#
-        )
-        .bind(&item.package_name)
-        .bind(&item.display_name)
-        .bind(&item.logo_url)
-        .bind(&item.background_url)
-        .bind(&item.author_name)
-        .bind(&item.author_website)
-        .bind(&item.about_summary)
-        .bind(&item.about_description)
-        .bind(&item.category)
-        .fetch_one(self.get_pool())
-        .await
-        .map_err(|_| DatabaseError(FailedToCreate {
-            entity_name: item.display_name.clone(),
-        }))
+        // Try to insert, but skip if package_name already exists
+        let result = sqlx::query_as::<_, Tapplet>(
+        r#"
+        INSERT OR IGNORE INTO tapplet (package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id, package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category
+        "#
+    )
+    .bind(&item.package_name)
+    .bind(&item.display_name)
+    .bind(&item.logo_url)
+    .bind(&item.background_url)
+    .bind(&item.author_name)
+    .bind(&item.author_website)
+    .bind(&item.about_summary)
+    .bind(&item.about_description)
+    .bind(&item.category)
+    .fetch_optional(self.get_pool())
+    .await;
+
+        match result {
+            Ok(Some(tapplet)) => Ok(tapplet),
+            Ok(None) => {
+                // Row was not inserted, so fetch the existing tapplet
+                sqlx::query_as::<_, Tapplet>(
+                "SELECT id, package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category FROM tapplet WHERE package_name = ?"
+            )
+            .bind(&item.package_name)
+            .fetch_one(self.get_pool())
+            .await
+            .map_err(|e| {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching existing tapplet {:?}: {:?}", &item.package_name, e);
+                DatabaseError(FailedToRetrieveData {
+                    entity_name: item.display_name.clone(),
+                })
+            })
+            }
+            Err(e) => {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ Failed to create DB error for tapplet {:?}: {:?}", &item.package_name, e);
+                Err(DatabaseError(FailedToCreate {
+                    entity_name: item.display_name.clone(),
+                }))
+            }
+        }
     }
 
     pub async fn update_tapplet(&self, id: i32, item: &UpdateTapplet) -> Result<u64, Error> {
@@ -348,11 +380,12 @@ impl SqliteStore {
         .bind(&item.registry_url)
         .fetch_one(self.get_pool())
         .await
-        .map_err(|_| {
-            DatabaseError(FailedToCreate {
-                entity_name: "TappletVersion".to_string(),
+.map_err(|e| {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating version of tapplet id {:?}: {:?}", &item.tapplet_id, e);
+                DatabaseError(FailedToCreate  {
+                    entity_name: item.version.clone(),
+                })
             })
-        })
     }
 
     pub async fn update_tapplet_version(
@@ -513,7 +546,7 @@ impl SqliteStore {
         .await
         .map_err(|_| {
             DatabaseError(FailedToRetrieveData {
-                entity_name: "TappletAsset".to_string(),
+                entity_name: "tapplet_asset".to_string(),
             })
         })
     }
@@ -695,9 +728,12 @@ impl SqliteStore {
     )
     .fetch_all(self.get_pool())
     .await
-    .map_err(|_| DatabaseError(FailedToRetrieveData {
-        entity_name: "installed_tapplet".to_string(),
-    }))?;
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error: {e:?}");
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "installed_tapplet".to_string(),
+            })
+        })?;
 
         let mut result = Vec::new();
 

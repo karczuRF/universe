@@ -138,8 +138,8 @@ pub async fn download_asset(
     let background_dest = tapp_asset_dir.join("background.svg");
 
     // TODO fix downloading tapp assest
-    download_file(&assets.icon_url, icon_dest.clone()).await?;
-    download_file(&assets.background_url, background_dest.clone()).await?;
+    // download_file(&assets.icon_url, icon_dest.clone()).await?;
+    // download_file(&assets.background_url, background_dest.clone()).await?;
 
     Ok(TappletAssets {
         icon_url: icon_dest.into_os_string().into_string().unwrap(),
