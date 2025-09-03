@@ -36,7 +36,7 @@ impl SqliteStore {
         .fetch_all(self.get_pool())
         .await
         .map_err(|e| {
-            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error: {e:?}");
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching all dev_tapplets: {:?}", e);
             DatabaseError(FailedToRetrieveData {
                 entity_name: "dev_tapplet".to_string(),
             })
@@ -50,8 +50,8 @@ impl SqliteStore {
         .bind(dev_tapplet_id)
         .fetch_one(self.get_pool())
         .await
-.map_err(|e| {
-            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error: {e:?}");
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching dev_tapplet by id {}: {:?}", dev_tapplet_id, e);
             DatabaseError(FailedToRetrieveData {
                 entity_name: "dev_tapplet".to_string(),
             })
@@ -74,7 +74,7 @@ impl SqliteStore {
         .fetch_one(self.get_pool())
         .await
         .map_err(|e| {
-            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error: {e:?}");
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating dev_tapplet {:?}: {:?}", &item.package_name, e);
             DatabaseError(FailedToRetrieveData {
                 entity_name: "dev_tapplet".to_string(),
             })
@@ -101,7 +101,8 @@ impl SqliteStore {
         .bind(id)
         .execute(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error updating dev_tapplet id {}: {:?}", id, e);
             DatabaseError(FailedToUpdate {
                 entity_name: item.display_name.clone(),
             })
@@ -114,7 +115,8 @@ impl SqliteStore {
             .bind(id)
             .execute(self.get_pool())
             .await
-            .map_err(|_| {
+            .map_err(|e| {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error deleting dev_tapplet id {}: {:?}", id, e);
                 DatabaseError(FailedToDelete {
                     entity_name: "Dev Tapplet".to_string(),
                 })
@@ -129,8 +131,8 @@ impl SqliteStore {
         )
         .fetch_all(self.get_pool())
         .await
-.map_err(|e| {
-            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error: {e:?}");
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching all tapplets: {:?}", e);
             DatabaseError(FailedToRetrieveData {
                 entity_name: "tapplet".to_string(),
             })
@@ -144,13 +146,15 @@ impl SqliteStore {
         .bind(tapplet_id)
         .fetch_one(self.get_pool())
         .await
-        .map_err(|_| DatabaseError(FailedToRetrieveData {
-            entity_name: "Tapplet".to_string(),
-        }))
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching tapplet by id {}: {:?}", tapplet_id, e);
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "Tapplet".to_string(),
+            })
+        })
     }
 
     pub async fn create_tapplet(&self, item: &CreateTapplet) -> Result<Tapplet, Error> {
-        // Try to insert, but skip if package_name already exists
         let result = sqlx::query_as::<_, Tapplet>(
         r#"
         INSERT OR IGNORE INTO tapplet (package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category)
@@ -173,7 +177,6 @@ impl SqliteStore {
         match result {
             Ok(Some(tapplet)) => Ok(tapplet),
             Ok(None) => {
-                // Row was not inserted, so fetch the existing tapplet
                 sqlx::query_as::<_, Tapplet>(
                 "SELECT id, package_name, display_name, logo_url, background_url, author_name, author_website, about_summary, about_description, category FROM tapplet WHERE package_name = ?"
             )
@@ -186,14 +189,14 @@ impl SqliteStore {
                     entity_name: item.display_name.clone(),
                 })
             })
-            }
-            Err(e) => {
-                error!(target: LOG_TARGET, "✋🏻🛑⛔️ Failed to create DB error for tapplet {:?}: {:?}", &item.package_name, e);
-                Err(DatabaseError(FailedToCreate {
-                    entity_name: item.display_name.clone(),
-                }))
-            }
         }
+        Err(e) => {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ Failed to create DB error for tapplet {:?}: {:?}", &item.package_name, e);
+            Err(DatabaseError(FailedToCreate {
+                entity_name: item.display_name.clone(),
+            }))
+        }
+    }
     }
 
     pub async fn update_tapplet(&self, id: i32, item: &UpdateTapplet) -> Result<u64, Error> {
@@ -224,7 +227,8 @@ impl SqliteStore {
         .bind(id)
         .execute(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error updating tapplet id {}: {:?}", id, e);
             DatabaseError(FailedToUpdate {
                 entity_name: item.display_name.clone(),
             })
@@ -237,7 +241,8 @@ impl SqliteStore {
             .bind(id)
             .execute(self.get_pool())
             .await
-            .map_err(|_| {
+            .map_err(|e| {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error deleting tapplet id {}: {:?}", id, e);
                 DatabaseError(FailedToDelete {
                     entity_name: "Tapplet".to_string(),
                 })
@@ -252,9 +257,12 @@ impl SqliteStore {
         )
         .fetch_all(self.get_pool())
         .await
-        .map_err(|_| DatabaseError(FailedToRetrieveData {
-            entity_name: "InstalledTapplet".to_string(),
-        }))
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching all installed_tapplets: {:?}", e);
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "InstalledTapplet".to_string(),
+            })
+        })
     }
 
     pub async fn get_installed_tapplet_by_id(&self, id: i32) -> Result<InstalledTapplet, Error> {
@@ -264,9 +272,12 @@ impl SqliteStore {
         .bind(id)
         .fetch_one(self.get_pool())
         .await
-        .map_err(|_| DatabaseError(FailedToRetrieveData {
-            entity_name: "InstalledTapplet".to_string(),
-        }))
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching installed_tapplet by id {}: {:?}", id, e);
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "InstalledTapplet".to_string(),
+            })
+        })
     }
 
     pub async fn create_installed_tapplet(
@@ -287,9 +298,12 @@ impl SqliteStore {
         .bind(&item.tari_permissions)
         .fetch_one(self.get_pool())
         .await
-        .map_err(|_| DatabaseError(FailedToCreate {
-            entity_name: "InstalledTapplet".to_string(),
-        }))
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating installed_tapplet: {:?}", e);
+            DatabaseError(FailedToCreate {
+                entity_name: "InstalledTapplet".to_string(),
+            })
+        })
     }
 
     pub async fn update_installed_tapplet(
@@ -316,7 +330,8 @@ impl SqliteStore {
         .bind(id)
         .execute(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error updating installed_tapplet id {}: {:?}", id, e);
             DatabaseError(FailedToUpdate {
                 entity_name: "InstalledTapplet".to_string(),
             })
@@ -329,7 +344,8 @@ impl SqliteStore {
             .bind(id)
             .execute(self.get_pool())
             .await
-            .map_err(|_| {
+            .map_err(|e| {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error deleting installed_tapplet id {}: {:?}", id, e);
                 DatabaseError(FailedToDelete {
                     entity_name: "InstalledTapplet".to_string(),
                 })
@@ -344,7 +360,8 @@ impl SqliteStore {
         )
         .fetch_all(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching all tapplet_versions: {:?}", e);
             DatabaseError(FailedToRetrieveData {
                 entity_name: "TappletVersion".to_string(),
             })
@@ -358,9 +375,12 @@ impl SqliteStore {
         .bind(id)
         .fetch_one(self.get_pool())
         .await
-        .map_err(|_| DatabaseError(FailedToRetrieveData {
-            entity_name: "TappletVersion".to_string(),
-        }))
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching tapplet_version by id {}: {:?}", id, e);
+            DatabaseError(FailedToRetrieveData {
+                entity_name: "TappletVersion".to_string(),
+            })
+        })
     }
 
     pub async fn create_tapplet_version(
@@ -380,12 +400,12 @@ impl SqliteStore {
         .bind(&item.registry_url)
         .fetch_one(self.get_pool())
         .await
-.map_err(|e| {
-                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating version of tapplet id {:?}: {:?}", &item.tapplet_id, e);
-                DatabaseError(FailedToCreate  {
-                    entity_name: item.version.clone(),
-                })
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating tapplet_version for tapplet_id {:?}: {:?}", &item.tapplet_id, e);
+            DatabaseError(FailedToCreate  {
+                entity_name: item.version.clone(),
             })
+        })
     }
 
     pub async fn update_tapplet_version(
@@ -410,7 +430,8 @@ impl SqliteStore {
         .bind(id)
         .execute(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error updating tapplet_version id {}: {:?}", id, e);
             DatabaseError(FailedToUpdate {
                 entity_name: "TappletVersion".to_string(),
             })
@@ -423,7 +444,8 @@ impl SqliteStore {
             .bind(id)
             .execute(self.get_pool())
             .await
-            .map_err(|_| {
+            .map_err(|e| {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error deleting tapplet_version id {}: {:?}", id, e);
                 DatabaseError(FailedToDelete {
                     entity_name: "TappletVersion".to_string(),
                 })
@@ -438,7 +460,8 @@ impl SqliteStore {
         )
         .fetch_all(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching all tapplet_audits: {:?}", e);
             DatabaseError(FailedToRetrieveData {
                 entity_name: "TappletAudit".to_string(),
             })
@@ -452,7 +475,8 @@ impl SqliteStore {
         .bind(id)
         .fetch_one(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching tapplet_audit by id {}: {:?}", id, e);
             DatabaseError(FailedToRetrieveData {
                 entity_name: "TappletAudit".to_string(),
             })
@@ -475,7 +499,8 @@ impl SqliteStore {
         .bind(&item.report_url)
         .fetch_one(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating tapplet_audit for tapplet_id {:?}: {:?}", &item.tapplet_id, e);
             DatabaseError(FailedToCreate {
                 entity_name: "TappletAudit".to_string(),
             })
@@ -502,7 +527,8 @@ impl SqliteStore {
         .bind(id)
         .execute(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error updating tapplet_audit id {}: {:?}", id, e);
             DatabaseError(FailedToUpdate {
                 entity_name: "TappletAudit".to_string(),
             })
@@ -515,7 +541,8 @@ impl SqliteStore {
             .bind(id)
             .execute(self.get_pool())
             .await
-            .map_err(|_| {
+            .map_err(|e| {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error deleting tapplet_audit id {}: {:?}", id, e);
                 DatabaseError(FailedToDelete {
                     entity_name: "TappletAudit".to_string(),
                 })
@@ -530,7 +557,8 @@ impl SqliteStore {
         )
         .fetch_all(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching all tapplet_assets: {:?}", e);
             DatabaseError(FailedToRetrieveData {
                 entity_name: "TappletAsset".to_string(),
             })
@@ -544,7 +572,8 @@ impl SqliteStore {
         .bind(id)
         .fetch_one(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching tapplet_asset by id {}: {:?}", id, e);
             DatabaseError(FailedToRetrieveData {
                 entity_name: "tapplet_asset".to_string(),
             })
@@ -567,7 +596,8 @@ impl SqliteStore {
         .bind(&item.background_url)
         .fetch_one(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating tapplet_asset for tapplet_id {:?}: {:?}", &item.tapplet_id, e);
             DatabaseError(FailedToCreate {
                 entity_name: "TappletAsset".to_string(),
             })
@@ -594,7 +624,8 @@ impl SqliteStore {
         .bind(id)
         .execute(self.get_pool())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error updating tapplet_asset id {}: {:?}", id, e);
             DatabaseError(FailedToUpdate {
                 entity_name: "TappletAsset".to_string(),
             })
@@ -607,7 +638,8 @@ impl SqliteStore {
             .bind(id)
             .execute(self.get_pool())
             .await
-            .map_err(|_| {
+            .map_err(|e| {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error deleting tapplet_asset id {}: {:?}", id, e);
                 DatabaseError(FailedToDelete {
                     entity_name: "TappletAsset".to_string(),
                 })
