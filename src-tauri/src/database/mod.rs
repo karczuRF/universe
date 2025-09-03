@@ -7,11 +7,9 @@ use std::{fs, path::PathBuf};
 
 pub const LOG_TARGET: &str = "tari::universe::database";
 
-/// Initialize and set up the database with migrations
 pub async fn initialize_database(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
     let db_file = PathBuf::from(db_path);
 
-    // Ensure the parent directory exists
     if let Some(parent) = db_file.parent() {
         if !parent.exists() {
             fs::create_dir_all(parent).map_err(|e| {
@@ -21,7 +19,6 @@ pub async fn initialize_database(db_path: &str) -> Result<SqlitePool, sqlx::Erro
         }
     }
 
-    // Create database if it doesn't exist
     if !sqlx::Sqlite::database_exists(db_path)
         .await
         .unwrap_or(false)
@@ -30,14 +27,12 @@ pub async fn initialize_database(db_path: &str) -> Result<SqlitePool, sqlx::Erro
         sqlx::Sqlite::create_database(db_path).await?;
     }
 
-    // Establish connection pool
     info!(target: LOG_TARGET, "Establishing database connection: {}", db_path);
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
         .connect(db_path)
         .await?;
 
-    // Run migrations
     info!(target: LOG_TARGET, "Running database migrations");
     sqlx::migrate!("./sqlite/migrations")
         .run(&pool)
