@@ -19,6 +19,7 @@ use std::{
 use tauri::Manager;
 pub const LOG_TARGET: &str = "tari::universe";
 pub const REGISTRY_URL: &str = env!("TAPP_REGISTRY_URL");
+pub const DOWNLOAD_ASSETS: bool = false; //TODO temporarly disable assets download
 
 pub fn delete_tapplet_folder(
     package_name: String,
@@ -102,7 +103,7 @@ pub fn get_tapp_download_path(
     Ok(tapplet_path)
 }
 
-async fn download_file(url: &str, dest: PathBuf) -> Result<(), Error> {
+async fn download_asset_file(url: &str, dest: PathBuf) -> Result<(), Error> {
     let client = reqwest::Client::new();
     let mut response = client.get(url).send().await.map_err(|_| {
         RequestError(FailedToDownload {
@@ -172,8 +173,10 @@ pub async fn download_asset(
     let background_dest = tapp_asset_dir.join("background.svg");
 
     // TODO fix downloading tapp assest
-    // download_file(&assets.icon_url, icon_dest.clone()).await?;
-    // download_file(&assets.background_url, background_dest.clone()).await?;
+    if DOWNLOAD_ASSETS && !assets.background_url.is_empty() && !assets.icon_url.is_empty() {
+        download_asset_file(&assets.icon_url, icon_dest.clone()).await?;
+        download_asset_file(&assets.background_url, background_dest.clone()).await?;
+    }
 
     Ok(TappletAssets {
         icon_url: icon_dest.into_os_string().into_string().unwrap(),
