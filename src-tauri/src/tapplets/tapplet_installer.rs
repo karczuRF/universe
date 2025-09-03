@@ -20,13 +20,47 @@ use tauri::Manager;
 pub const LOG_TARGET: &str = "tari::universe";
 pub const REGISTRY_URL: &str = env!("TAPP_REGISTRY_URL");
 
-pub fn delete_tapplet_folder(tapplet_path: PathBuf) -> Result<(), Error> {
+pub fn delete_tapplet_folder(
+    package_name: String,
+    version: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), Error> {
+    let tapplet_path = get_tapp_download_path(package_name.clone(), version, app_handle)?;
+
     let path = tapplet_path
         .clone()
         .into_os_string()
         .into_string()
         .map_err(|_| IOError(FailedToGetFilePath))?;
-    fs::remove_dir_all(tapplet_path).map_err(|_| IOError(FailedToDeleteTapplet { path }))
+
+    fs::remove_dir_all(&tapplet_path).map_err(|_| IOError(FailedToDeleteTapplet { path }))?;
+
+    if let Some(package_dir) = tapplet_path.parent() {
+        // Check if the package directory is empty (no other versions remain)
+        match fs::read_dir(package_dir) {
+            Ok(mut entries) => {
+                if entries.next().is_none() {
+                    let package_path = package_dir
+                        .to_path_buf()
+                        .into_os_string()
+                        .into_string()
+                        .map_err(|_| IOError(FailedToGetFilePath))?;
+
+                    fs::remove_dir(package_dir)
+                        .map_err(|_| IOError(FailedToDeleteTapplet { path: package_path }))?;
+
+                    info!(target: LOG_TARGET, "Removed empty package directory: {}", package_name);
+                }
+            }
+            Err(_) => {
+                // If we can't read the directory, it might not exist or we don't have permissions
+                // This is not a critical error, so we'll just log a warning
+                warn!(target: LOG_TARGET, "Could not read package directory to check if empty: {}", package_name);
+            }
+        }
+    }
+
+    Ok(())
 }
 
 pub fn check_extracted_files(tapplet_path: PathBuf) -> Result<bool, Error> {

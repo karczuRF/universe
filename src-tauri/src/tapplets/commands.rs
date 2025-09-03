@@ -521,9 +521,7 @@ pub async fn delete_installed_tapplet(
 
     let _ = stop_tapplet(tapplet_id, tapplet_manager).await;
 
-    let tapplet_path = get_tapp_download_path(package_name, version, app_handle)
-        .map_err(|e| InvokeError::from_error(e))?;
-    delete_tapplet_folder(tapplet_path)?;
+    delete_tapplet_folder(package_name, version, app_handle)?;
 
     store
         .delete_installed_tapplet(tapplet_id)
