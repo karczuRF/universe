@@ -305,7 +305,7 @@ pub async fn fetch_registered_tapplets(
     let store = SqliteStore::new(db_connection.0.clone());
 
     for tapplet_manifest in tapplets.registered_tapplets.values() {
-        info!(target: LOG_TARGET, "🪧 fetched tapp manifest: {:?}", &tapplet_manifest);
+        info!(target: LOG_TARGET, "🪧 fetched tapp manifest for: {:?}", &tapplet_manifest.id);
 
         let inserted_tapplet = store
             .create_tapplet(&CreateTapplet::from(tapplet_manifest))
@@ -339,34 +339,7 @@ pub async fn fetch_registered_tapplets(
                 .await
                 .map_err(|e| InvokeError::from_error(e))?;
         }
-        // match store
-        //     .get_tapplet_asset_by_id(inserted_tapplet.id.unwrap())
-        //     .await
-        // {
-        //     Ok(_asset) => {
-        //         match download_asset(app_handle.clone(), inserted_tapplet.package_name).await {
-        //             Ok(tapplet_assets) => {
-        //                 let _ = store
-        //                     .create_tapplet_asset(
-        //                         &(CreateTappletAsset {
-        //                             tapplet_id: inserted_tapplet.id,
-        //                             icon_url: tapplet_assets.icon_url,
-        //                             background_url: tapplet_assets.background_url,
-        //                         }),
-        //                     )
-        //                     .await
-        //                     .map_err(|e| e.to_string());
-        //             }
-        //             Err(e) => {
-        //                 error!(target: LOG_TARGET, "Could not download tapplet assets: {}", e);
-        //             }
-        //         }
-        //     }
-        //     Err(e) => {
-        //         return Err(InvokeError::from_error(e));
-        //     }
-        // }
-        // First, try to download and create the tapplet asset
+
         match download_asset(app_handle.clone(), inserted_tapplet.package_name).await {
             Ok(tapplet_assets) => {
                 let create_result = store
@@ -379,22 +352,19 @@ pub async fn fetch_registered_tapplets(
 
                 match create_result {
                     Ok(_) => {
-                        // Now get the asset by id
-                        info!(target: LOG_TARGET, "⚠️ Asset download temporarily unavailable");
-
-                        // match store
-                        //     .get_tapplet_asset_by_id(inserted_tapplet.id.unwrap())
-                        //     .await
-                        // {
-                        //     Ok(asset) => {
-                        //         // Asset successfully created and fetched
-                        //         info!(target: LOG_TARGET, "Tapplet assets added successfully for tapplet id: {:?}", asset.id);
-                        //     }
-                        //     Err(e) => {
-                        //         error!(target: LOG_TARGET, "Could not fetch tapplet asset after creation: {}", e);
-                        //         return Err(InvokeError::from_error(e));
-                        //     }
-                        // }
+                        match store
+                            .get_tapplet_asset_by_id(inserted_tapplet.id.unwrap())
+                            .await
+                        {
+                            Ok(asset) => {
+                                // Asset successfully created and fetched
+                                info!(target: LOG_TARGET, "Tapplet assets added successfully for tapplet id: {:?}", asset.id);
+                            }
+                            Err(e) => {
+                                error!(target: LOG_TARGET, "Could not fetch tapplet asset after creation: {}", e);
+                                return Err(InvokeError::from_error(e));
+                            }
+                        }
                     }
                     Err(e) => {
                         error!(target: LOG_TARGET, "Could not create tapplet asset: {}", e);
@@ -404,12 +374,11 @@ pub async fn fetch_registered_tapplets(
             }
             Err(e) => {
                 error!(target: LOG_TARGET, "Could not download tapplet assets: {}", e);
-                // return Err(InvokeError::from_error(Error::DatabaseError(
-                //     crate::tapplets::error::DatabaseError::FailedToCreate {
-                //         entity_name: "tapplet_asset".to_string(),
-                //     },
-                // )));
-                return Ok(());
+                return Err(InvokeError::from_error(Error::DatabaseError(
+                    crate::tapplets::error::DatabaseError::FailedToCreate {
+                        entity_name: "tapplet_asset".to_string(),
+                    },
+                )));
             }
         }
     }
