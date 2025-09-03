@@ -387,25 +387,45 @@ impl SqliteStore {
         &self,
         item: &CreateTappletVersion,
     ) -> Result<TappletVersion, Error> {
-        sqlx::query_as::<_, TappletVersion>(
+        let result = sqlx::query_as::<_, TappletVersion>(
             r#"
-            INSERT INTO tapplet_version (tapplet_id, version, integrity, registry_url)
-            VALUES (?, ?, ?, ?)
-            RETURNING id, tapplet_id, version, integrity, registry_url
-            "#,
+        INSERT OR IGNORE INTO tapplet_version (tapplet_id, version, integrity, registry_url)
+        VALUES (?, ?, ?, ?)
+        RETURNING id, tapplet_id, version, integrity, registry_url
+        "#,
         )
         .bind(item.tapplet_id)
         .bind(&item.version)
         .bind(&item.integrity)
         .bind(&item.registry_url)
-        .fetch_one(self.get_pool())
-        .await
-        .map_err(|e| {
-            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating tapplet_version for tapplet_id {:?}: {:?}", &item.tapplet_id, e);
-            DatabaseError(FailedToCreate  {
-                entity_name: item.version.clone(),
+        .fetch_optional(self.get_pool())
+        .await;
+
+        match result {
+            Ok(Some(tapplet_version)) => Ok(tapplet_version),
+            Ok(None) => {
+                // Already exists, fetch and return the existing row
+                sqlx::query_as::<_, TappletVersion>(
+                "SELECT id, tapplet_id, version, integrity, registry_url FROM tapplet_version WHERE tapplet_id = ? AND version = ?"
+            )
+            .bind(item.tapplet_id)
+            .bind(&item.version)
+            .fetch_one(self.get_pool())
+            .await
+            .map_err(|e| {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching existing tapplet_version for tapplet_id {:?} ver {:?}: {:?}", &item.tapplet_id, &item.version, e);
+                DatabaseError(FailedToRetrieveData {
+                    entity_name: item.version.clone(),
+                })
             })
-        })
+            }
+            Err(e) => {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating tapplet_version for tapplet_id {:?} ver {:?}: {:?}", &item.tapplet_id, &item.version, e);
+                Err(DatabaseError(FailedToCreate {
+                    entity_name: item.version.clone(),
+                }))
+            }
+        }
     }
 
     pub async fn update_tapplet_version(
@@ -487,26 +507,46 @@ impl SqliteStore {
         &self,
         item: &CreateTappletAudit,
     ) -> Result<TappletAudit, Error> {
-        sqlx::query_as::<_, TappletAudit>(
+        let result = sqlx::query_as::<_, TappletAudit>(
             r#"
-            INSERT INTO tapplet_audit (tapplet_id, auditor, report_url)
-            VALUES (?, ?, ?)
-            RETURNING id, tapplet_id, auditor, report_url
-            "#,
+        INSERT OR IGNORE INTO tapplet_audit (tapplet_id, auditor, report_url)
+        VALUES (?, ?, ?)
+        RETURNING id, tapplet_id, auditor, report_url
+        "#,
         )
         .bind(item.tapplet_id)
         .bind(&item.auditor)
         .bind(&item.report_url)
-        .fetch_one(self.get_pool())
-        .await
-        .map_err(|e| {
-            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating tapplet_audit for tapplet_id {:?}: {:?}", &item.tapplet_id, e);
-            DatabaseError(FailedToCreate {
-                entity_name: "TappletAudit".to_string(),
-            })
-        })
-    }
+        .fetch_optional(self.get_pool())
+        .await;
 
+        match result {
+            Ok(Some(tapplet_audit)) => Ok(tapplet_audit),
+            Ok(None) => {
+                // Already exists, fetch and return the existing row
+                sqlx::query_as::<_, TappletAudit>(
+                "SELECT id, tapplet_id, auditor, report_url FROM tapplet_audit WHERE tapplet_id = ? AND auditor = ? AND report_url = ?"
+            )
+            .bind(item.tapplet_id)
+            .bind(&item.auditor)
+            .bind(&item.report_url)
+            .fetch_one(self.get_pool())
+            .await
+            .map_err(|e| {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching existing tapplet_audit for tapplet_id {:?}, auditor {:?}: {:?}", item.tapplet_id, item.auditor, e);
+                DatabaseError(FailedToRetrieveData {
+                    entity_name: "TappletAudit".to_string(),
+                })
+            })
+            }
+            Err(e) => {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating tapplet_audit for tapplet_id {:?}, auditor {:?}: {:?}", item.tapplet_id, item.auditor, e);
+                Err(DatabaseError(FailedToCreate {
+                    entity_name: "TappletAudit".to_string(),
+                }))
+            }
+        }
+    }
     pub async fn update_tapplet_audit(
         &self,
         id: i32,
@@ -584,24 +624,45 @@ impl SqliteStore {
         &self,
         item: &CreateTappletAsset,
     ) -> Result<TappletAsset, Error> {
-        sqlx::query_as::<_, TappletAsset>(
+        let result = sqlx::query_as::<_, TappletAsset>(
             r#"
-            INSERT INTO tapplet_asset (tapplet_id, icon_url, background_url)
-            VALUES (?, ?, ?)
-            RETURNING id, tapplet_id, icon_url, background_url
-            "#,
+        INSERT OR IGNORE INTO tapplet_asset (tapplet_id, icon_url, background_url)
+        VALUES (?, ?, ?)
+        RETURNING id, tapplet_id, icon_url, background_url
+        "#,
         )
         .bind(item.tapplet_id)
         .bind(&item.icon_url)
         .bind(&item.background_url)
-        .fetch_one(self.get_pool())
-        .await
-        .map_err(|e| {
-            error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating tapplet_asset for tapplet_id {:?}: {:?}", &item.tapplet_id, e);
-            DatabaseError(FailedToCreate {
-                entity_name: "TappletAsset".to_string(),
+        .fetch_optional(self.get_pool())
+        .await;
+
+        match result {
+            Ok(Some(tapplet_asset)) => Ok(tapplet_asset),
+            Ok(None) => {
+                // Already exists, fetch and return the existing row
+                sqlx::query_as::<_, TappletAsset>(
+                "SELECT id, tapplet_id, icon_url, background_url FROM tapplet_asset WHERE tapplet_id = ? AND icon_url = ? AND background_url = ?"
+            )
+            .bind(item.tapplet_id)
+            .bind(&item.icon_url)
+            .bind(&item.background_url)
+            .fetch_one(self.get_pool())
+            .await
+            .map_err(|e| {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error fetching existing tapplet_asset for tapplet_id {:?}: {:?}", item.tapplet_id, e);
+                DatabaseError(FailedToRetrieveData {
+                    entity_name: "TappletAsset".to_string(),
+                })
             })
-        })
+            }
+            Err(e) => {
+                error!(target: LOG_TARGET, "✋🏻🛑⛔️ DB error creating tapplet_asset for tapplet_id {:?}: {:?}", item.tapplet_id, e);
+                Err(DatabaseError(FailedToCreate {
+                    entity_name: "TappletAsset".to_string(),
+                }))
+            }
+        }
     }
 
     pub async fn update_tapplet_asset(
