@@ -18,7 +18,7 @@ CREATE TABLE tapplet_version (
   version TEXT NOT NULL,
   integrity TEXT NOT NULL,
   registry_url TEXT NOT NULL,
-  UNIQUE(version, tapplet_id),
+  UNIQUE(tapplet_id, version),
   FOREIGN KEY (tapplet_id) REFERENCES tapplet(id)
 );
 
