@@ -180,19 +180,16 @@ pub async fn start_tari_tapplet_binary(
         .get_binary_path(binary)
         .await
         .map_err(|e| InvokeError::from_anyhow(e))?;
-    let tapp_ver = binaries_resolver.get_binary_version(binary).await;
-
     let store = SqliteStore::new(db_connection.0.clone());
-    let csp_bridge = "default-src 'self' https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'";
 
     let tapplet = store
-        .get_tapplet_by_name(binary_name.to_string())
+        .get_installed_tapplet_by_name(binary_name.to_string())
         .await
         .map_err(|e| InvokeError::from_error(e))?;
 
     match tapplet {
-        Some(tapp) => {
-            let tapplet_id = tapp.id.ok_or_else(|| {
+        Some(installed) => {
+            let tapplet_id = installed.id.ok_or_else(|| {
                 InvokeError::from_error(Error::DatabaseError(
                     crate::tapplets::error::DatabaseError::FailedToRetrieveData {
                         entity_name: "tapplet.id is None".to_string(),
@@ -201,14 +198,21 @@ pub async fn start_tari_tapplet_binary(
             })?;
 
             let addr =
-                start_tapplet_server(tapplet_id, tapp_path, csp_bridge, &tapplet_manager).await?;
+                start_tapplet_server(tapplet_id, tapp_path, &installed.csp, &tapplet_manager)
+                    .await?;
+
+            let (tapp, tapp_version) = store
+                .get_registered_tapplet_with_version(tapplet_id)
+                .await
+                .map_err(|e| InvokeError::from_error(e))?;
+            info!(target: LOG_TARGET, "🎉🎉🎉 TAPP binary {:?} with csp {:?}", &tapp.package_name, &installed.csp);
 
             Ok(ActiveTapplet {
                 tapplet_id,
                 package_name: tapp.package_name.to_string(),
                 display_name: tapp.display_name.to_string(),
                 source: format!("http://{addr}"),
-                version: tapp_ver,
+                version: tapp_version.version,
             })
         }
         None => Err(InvokeError::from_error(Error::DatabaseError(

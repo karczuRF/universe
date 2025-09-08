@@ -811,6 +811,29 @@ impl SqliteStore {
         Ok(None)
     }
 
+    pub async fn get_installed_tapplet_by_name(
+        &self,
+        package_name: String,
+    ) -> Result<Option<InstalledTapplet>, Error> {
+        if let Ok(installed_tapplet) = sqlx::query_as::<_, InstalledTapplet>(
+            r#"
+            SELECT it.id, it.tapplet_id, it.tapplet_version_id, it.source, it.csp, it.tari_permissions
+            FROM installed_tapplet it
+            INNER JOIN tapplet t ON it.tapplet_id = t.id
+            WHERE t.package_name = ?
+            LIMIT 1
+            "#
+        )
+        .bind(&package_name)
+        .fetch_one(self.get_pool())
+        .await
+        {
+            return Ok(Some(installed_tapplet));
+        }
+
+        Ok(None)
+    }
+
     pub async fn get_registered_tapplet_with_version(
         &self,
         registered_tapplet_id: i32,
