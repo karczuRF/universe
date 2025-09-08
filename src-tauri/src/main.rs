@@ -70,15 +70,19 @@ use app_in_memory_config::EXCHANGE_ID;
 
 use telemetry_manager::TelemetryManager;
 
+use crate::consts::DB_FILE_NAME;
 use crate::cpu_miner::CpuMiner;
 
 use crate::commands::CpuMinerConnection;
+use crate::database::store::DatabaseConnection;
 use crate::feedback::Feedback;
 use crate::gpu_miner::GpuMiner;
 use crate::mm_proxy_manager::MmProxyManager;
 use crate::node::node_manager::NodeManager;
 use crate::p2pool::models::P2poolStats;
 use crate::p2pool_manager::P2poolManager;
+use crate::tapplets::commands as tapplet_commands;
+use crate::tapplets::tapplet_manager::TappletManager;
 use crate::tor_manager::TorManager;
 use crate::wallet::wallet_manager::WalletManager;
 use crate::wallet::wallet_types::WalletState;
@@ -93,6 +97,7 @@ mod configs;
 mod consts;
 mod cpu_miner;
 mod credential_manager;
+mod database;
 mod download_utils;
 mod events;
 mod events_emitter;
@@ -356,6 +361,8 @@ fn main() {
         base_node_watch_rx.clone(),
         app_in_memory_config.clone(),
     );
+    let tapplet_manager = TappletManager::new();
+
     let app_state = UniverseAppState {
         is_getting_p2pool_connections: Arc::new(AtomicBool::new(false)),
         node_status_watch_rx: Arc::new(base_node_watch_rx),
@@ -429,6 +436,23 @@ fn main() {
             if logs_cleared_file.exists() {
                 remove_file(&logs_cleared_file).map_err(|e| e.to_string())?;
             }
+
+            // Initialize database with improved error handling
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("Could not get app data dir");
+            let db_path = app_data_dir.join(DB_FILE_NAME);
+            let db_path_str = db_path.to_str().expect("Could not get db path");
+
+            // Use the improved initialization function with proper error handling
+            let pool = block_on(database::initialize_database(db_path_str)).map_err(|e| {
+                error!(target: LOG_TARGET, "Failed to initialize database: {}", e);
+                format!("Database initialization failed: {}", e)
+            })?;
+
+            app.manage(DatabaseConnection(Arc::new(pool)));
+            app.manage(tapplet_manager);
 
             let contents = setup_logging(
                 &log_path
@@ -618,7 +642,6 @@ fn main() {
             commands::trigger_phases_restart,
             commands::set_node_type,
             commands::set_allow_notifications,
-            commands::launch_builtin_tapplet,
             commands::get_bridge_envs,
             commands::parse_tari_address,
             commands::refresh_wallet_history,
@@ -638,7 +661,24 @@ fn main() {
             commands::reset_gpu_pool_config,
             commands::reset_cpu_pool_config,
             commands::restart_phases,
-            commands::list_connected_peers
+            commands::list_connected_peers,
+            tapplet_commands::start_tari_tapplet_binary,
+            tapplet_commands::start_dev_tapplet,
+            tapplet_commands::start_tapplet,
+            tapplet_commands::fetch_registered_tapplets,
+            tapplet_commands::insert_tapp_registry_db,
+            tapplet_commands::read_tapp_registry_db,
+            tapplet_commands::get_assets_server_addr,
+            tapplet_commands::download_and_extract_tapp,
+            tapplet_commands::read_installed_tapp_db,
+            tapplet_commands::delete_installed_tapplet,
+            tapplet_commands::add_dev_tapplet,
+            tapplet_commands::read_dev_tapplets_db,
+            tapplet_commands::delete_dev_tapplet,
+            tapplet_commands::update_installed_tapplet,
+            tapplet_commands::stop_tapplet,
+            tapplet_commands::restart_tapplet,
+            tapplet_commands::is_tapplet_server_running,
         ])
         .build(tauri::generate_context!())
         .inspect_err(|e| {

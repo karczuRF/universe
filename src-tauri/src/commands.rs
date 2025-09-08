@@ -44,8 +44,8 @@ use crate::pin::PinManager;
 use crate::release_notes::ReleaseNotes;
 use crate::setup::setup_manager::{SetupManager, SetupPhase};
 use crate::system_dependencies::system_dependencies_manager::SystemDependenciesManager;
+use crate::tapplets::commands::start_tapplet;
 use crate::tapplets::interface::ActiveTapplet;
-use crate::tapplets::tapplet_server::start_tapplet;
 use crate::tasks_tracker::TasksTrackers;
 use crate::tor_adapter::TorConfig;
 use crate::utils::address_utils::verify_send;
@@ -2231,38 +2231,6 @@ pub async fn set_seed_backed_up() -> Result<(), String> {
     EventsEmitter::emit_seed_backed_up(true).await;
 
     Ok(())
-}
-
-/*
- ********** TAPPLETS SECTION **********
-*/
-
-#[tauri::command]
-pub async fn launch_builtin_tapplet() -> Result<ActiveTapplet, String> {
-    let binaries_resolver = BinaryResolver::current();
-
-    let tapp_dest_dir = binaries_resolver
-        .get_binary_path(Binaries::BridgeTapplet)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let handle_start =
-        tauri::async_runtime::spawn(async move { start_tapplet(tapp_dest_dir).await });
-
-    let (addr, _cancel_token) = match handle_start.await {
-        Ok(result) => result.map_err(|e| e.to_string())?,
-        Err(e) => {
-            error!(target: LOG_TARGET, "❌ Error handling tapplet start: {e:?}");
-            return Err(e.to_string());
-        }
-    };
-
-    Ok(ActiveTapplet {
-        tapplet_id: 0,
-        display_name: "Bridge-wXTM".to_string(),
-        source: format!("http://{addr}"),
-        version: "1.0.0".to_string(),
-    })
 }
 
 #[tauri::command]

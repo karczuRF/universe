@@ -45,7 +45,8 @@ export const useTappletsStore = create<TappletsStoreState>()((set, get) => ({
 
         // built-in tapplet
         if (isBuiltIn) {
-            const activeTapplet = await invoke('launch_builtin_tapplet');
+            const name = 'bridge'; //TODO add names for more options
+            const activeTapplet = await invoke('start_tari_tapplet_binary', { binaryName: name });
             set({ activeTapplet });
             return;
         }
