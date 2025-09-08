@@ -172,6 +172,7 @@ async fn process_tapplet_manifest(
 pub async fn start_tari_tapplet_binary(
     binary_name: &str,
     tapplet_manager: tauri::State<'_, TappletManager>,
+    db_connection: tauri::State<'_, DatabaseConnection>,
 ) -> CommandResult<ActiveTapplet> {
     let binaries_resolver = BinaryResolver::current();
     let binary = Binaries::from_name(binary_name);
@@ -179,19 +180,43 @@ pub async fn start_tari_tapplet_binary(
         .get_binary_path(binary)
         .await
         .map_err(|e| InvokeError::from_anyhow(e))?;
+    let tapp_ver = binaries_resolver.get_binary_version(binary).await;
 
+    let store = SqliteStore::new(db_connection.0.clone());
     let csp_bridge = "default-src 'self' https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'";
-    let tapp_id = 0; // TODO: get from installed_tapp db
 
-    let addr = start_tapplet_server(tapp_id, tapp_path, csp_bridge, &tapplet_manager).await?;
+    let tapplet = store
+        .get_tapplet_by_name(binary_name.to_string())
+        .await
+        .map_err(|e| InvokeError::from_error(e))?;
 
-    Ok(ActiveTapplet {
-        tapplet_id: 1000, // TODO: fix hardcoded value
-        package_name: binary_name.to_string(),
-        display_name: binary_name.to_string(),
-        source: format!("http://{addr}"),
-        version: "0.1.0".to_string(), // TODO: get actual version
-    })
+    match tapplet {
+        Some(tapp) => {
+            let tapplet_id = tapp.id.ok_or_else(|| {
+                InvokeError::from_error(Error::DatabaseError(
+                    crate::tapplets::error::DatabaseError::FailedToRetrieveData {
+                        entity_name: "tapplet.id is None".to_string(),
+                    },
+                ))
+            })?;
+
+            let addr =
+                start_tapplet_server(tapplet_id, tapp_path, csp_bridge, &tapplet_manager).await?;
+
+            Ok(ActiveTapplet {
+                tapplet_id,
+                package_name: tapp.package_name.to_string(),
+                display_name: tapp.display_name.to_string(),
+                source: format!("http://{addr}"),
+                version: tapp_ver,
+            })
+        }
+        None => Err(InvokeError::from_error(Error::DatabaseError(
+            crate::tapplets::error::DatabaseError::FailedToRetrieveData {
+                entity_name: format!("tapplet with name '{}'", binary_name),
+            },
+        ))),
+    }
 }
 
 #[tauri::command]
@@ -617,14 +642,16 @@ pub async fn register_bridge_tapplet_in_database(
 ) -> Result<(), anyhow::Error> {
     let db_connection = app_handle.state::<DatabaseConnection>();
     let store = SqliteStore::new(db_connection.0.clone());
+    let binary_resolver = BinaryResolver::current();
+    let binary = Binaries::from_name("bridge");
+    let name = binary.name();
 
     // Check if bridge tapplet is already registered
-    if let Ok(Some(_)) = store.get_tapplet_by_name("wxtm-bridge".to_string()).await {
+    if let Ok(Some(_)) = store.get_tapplet_by_name(name.to_string()).await {
         info!(target: LOG_TARGET, "💎💎 Bridge tapplet already registered in database");
         return Ok(());
     }
 
-    let binary_resolver = BinaryResolver::current();
     let tapp_path = binary_resolver
         .get_binary_path(Binaries::BridgeTapplet)
         .await?;
@@ -636,7 +663,7 @@ pub async fn register_bridge_tapplet_in_database(
 
     // Create the bridge tapplet entry
     let create_tapp = CreateTapplet {
-        package_name: "wxtm-bridge".to_string(),
+        package_name: name.to_string(),
         display_name: "WXTM Bridge".to_string(),
         logo_url: "".to_string(),
         background_url: "".to_string(),
@@ -647,17 +674,12 @@ pub async fn register_bridge_tapplet_in_database(
         category: "".to_string(),
     };
 
-    // Insert with specific ID - you'll need to add this method to SqliteStore
-    let tapp_registered = store
-        // .create_installed_tapplet_with_id(BRIDGE_TAPPLET_ID, &bridge_tapplet) // TODO does tapp_id need to be fixed in this case?
-        .create_tapplet(&create_tapp)
-        .await
-        .map_err(|e| {
-            error!(target: LOG_TARGET, "Failed to register bridge tapplet: {}", e);
-            anyhow::anyhow!("Failed to register bridge tapplet: {}", e)
-        })?;
+    let tapp_registered = store.create_tapplet(&create_tapp).await.map_err(|e| {
+        error!(target: LOG_TARGET, "Failed to register bridge tapplet: {}", e);
+        anyhow::anyhow!("Failed to register bridge tapplet: {}", e)
+    })?;
     info!(target: LOG_TARGET, "💎💎 Bridge tapplet registered successfully with ID: {:?}", tapp_registered.id.unwrap());
-    // Create the bridge tapplet entry
+
     let ver_tapp = CreateTappletVersion {
         tapplet_id: tapp_registered.id,
         version: version,
