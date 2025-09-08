@@ -68,7 +68,7 @@ impl TappletManager {
     ) -> Result<String, anyhow::Error> {
         let allowed_csp = allow_csp_dialog(csp, app_handle).await?;
         if allowed_csp.to_lowercase() != "null" {
-            info!(target: LOG_TARGET, "💭 Tapplet's CSP accepted. CSP: {:?}", &allowed_csp);
+            info!(target: LOG_TARGET, "Tapplet's CSP accepted. CSP: {:?}", &allowed_csp);
             Ok(allowed_csp)
         } else {
             warn!(target: LOG_TARGET, "Tapplet's CSP was not accepted (null)");
@@ -81,7 +81,7 @@ impl TappletManager {
     ) -> Result<String, anyhow::Error> {
         let granted_permissions = grant_permissions_dialog(permissions, app_handle).await?;
         if granted_permissions.to_lowercase() != "null" {
-            info!(target: LOG_TARGET, "💭 Tapplet's permissions granted: {:?}", &granted_permissions);
+            info!(target: LOG_TARGET, "Tapplet's permissions granted: {:?}", &granted_permissions);
             Ok(granted_permissions)
         } else {
             warn!(target: LOG_TARGET, "Tapplet's permissions were not granted (null)");
@@ -96,19 +96,16 @@ impl TappletManager {
         app_handle: tauri::AppHandle,
     ) -> Result<CheckPermissionsResult, anyhow::Error> {
         let config = get_tapp_config(source).await?;
-        info!(target: LOG_TARGET, "💥 Dev tapplet csp: {}", &config.csp);
 
         let mut updated_csp = current_csp.to_string();
         let mut updated_permissions = current_permissions.to_string();
 
         let mut should_update_csp = config.csp.trim_matches('"') != current_csp.trim_matches('"');
-        info!(target: LOG_TARGET, "👀 SHOULD UPDATE CSP?{:?}", should_update_csp);
         if should_update_csp {
             let allowed_csp_result =
                 TappletManager::allow_tapplet_csp(config.csp, &app_handle).await;
             should_update_csp = match allowed_csp_result {
                 Ok(csp) => {
-                    info!(target: LOG_TARGET, "💥 allowed to update {}", &csp);
                     updated_csp = csp;
                     true
                 }
@@ -121,7 +118,6 @@ impl TappletManager {
 
         let mut should_update_permissions =
             config.permissions.all_permissions_to_string() != current_permissions.trim_matches('"');
-        info!(target: LOG_TARGET, "👀 SHOULD UPDATE PERMISSIONS?{:?}", should_update_permissions);
         if should_update_permissions {
             let granted_permissions = TappletManager::grant_tapplet_permissions(
                 config.permissions.all_permissions_to_string(),
@@ -129,7 +125,6 @@ impl TappletManager {
             )
             .await
             .map_err(|e| e.to_string());
-            info!(target: LOG_TARGET, "💥 Grant permissions result: {:?}", granted_permissions);
 
             should_update_permissions = match granted_permissions {
                 Ok(p) => {
@@ -150,14 +145,12 @@ impl TappletManager {
         })
     }
 
-    /// Wrapper to start the server and track it by tapplet_id
     pub async fn start_server(
         &self,
         tapplet_id: i32,
         tapplet_path: PathBuf,
         csp: &String,
     ) -> Result<String, Error> {
-        info!(target: LOG_TARGET, "👉👉👉 Start server with manager {:?}", &tapplet_id);
         let (address, cancel_token) = start_tapplet_server(tapplet_path, csp).await?;
 
         self.server_manager
@@ -262,7 +255,6 @@ where
 
     let response = rx.await.unwrap_or_default();
     if let Some(response_str) = response {
-        log::info!("📩 RESPONSE RECEIVED {:?}", &response_str);
         Ok(response_str)
     } else {
         log::info!("Granting tapplet permissions failed");

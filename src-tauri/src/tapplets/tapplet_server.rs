@@ -113,8 +113,6 @@ pub async fn start_tapplet_server(
         HeaderValue::from_static("default-src 'self'")
     });
 
-    info!(target: LOG_TARGET, "🚨📢🔔⚠️ SERVER WITH CSP {:?}", &csp_header);
-    // Build router with dynamically created CSP header middleware
     let app = using_serve_dir(tapplet_path, csp_header);
 
     serve(app, addr).await
@@ -145,7 +143,7 @@ pub async fn serve(app: Router, addr: SocketAddr) -> Result<(String, Cancellatio
             .inspect_err(|e| error!(target: LOG_TARGET, "Failed to start server error: {e:?}"))
             .map_err(|_| TappletServerError(FailedToStart))
     });
-    info!(target: LOG_TARGET, "🚀 The tapplet was launched at the address: {:?}", &address);
+    info!(target: LOG_TARGET, "The tapplet was launched at the address: {:?}", &address);
 
     Ok((address, cancel_token))
 }
@@ -171,7 +169,6 @@ pub fn is_http_or_localhost(s: &str) -> bool {
 pub fn _get_tapplet_manifest(tapp_path: PathBuf) -> Result<TappletManifest, Error> {
     // for a dev tapplet the tapplet.manifest.json file is in root dir
     let tapp_manifest = tapp_path.join("tapplet.manifest.json");
-    info!(target: LOG_TARGET, "💥 get_config {:?}", &tapp_manifest);
 
     if !tapp_manifest.exists() {
         warn!(target: LOG_TARGET, "❌ Failed to get Tapplet permissions. Config file not found.");
@@ -179,10 +176,8 @@ pub fn _get_tapplet_manifest(tapp_path: PathBuf) -> Result<TappletManifest, Erro
     }
 
     let config = fs::read_to_string(tapp_manifest.clone()).unwrap_or_default();
-    info!(target: LOG_TARGET, "💥 Dev tapplet config: {:?}", &config);
     let manifest: TappletManifest =
         serde_json::from_str(&config).map_err(|e| JsonParsingError(e))?;
-    info!(target: LOG_TARGET, "💥 Dev tapplet full config: {:?}", &manifest);
     Ok(manifest)
 }
 
@@ -214,7 +209,6 @@ pub async fn get_tapp_config(source: &str) -> Result<TappletConfig, Error> {
         // source as a local path
         let tapp_path = PathBuf::from(source);
         let tapp_config = tapp_path.join("tapplet.config.json");
-        info!(target: LOG_TARGET, "Reading tapplet config from {:?}", &tapp_config);
 
         if !tapp_config.exists() {
             warn!(target: LOG_TARGET, "❌ Failed to get Tapplet permissions. Config file not found.");
@@ -222,10 +216,8 @@ pub async fn get_tapp_config(source: &str) -> Result<TappletConfig, Error> {
         }
 
         let config = fs::read_to_string(&tapp_config).unwrap_or_default();
-        info!(target: LOG_TARGET, "💥 Dev tapplet config: {:?}", &config);
         let tapplet_config: TappletConfig =
             serde_json::from_str(&config).map_err(JsonParsingError)?;
-        info!(target: LOG_TARGET, "💥 Dev tapplet full config: {:?}", &tapplet_config);
         Ok(tapplet_config)
     }
 }
